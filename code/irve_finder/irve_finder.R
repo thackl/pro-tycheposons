@@ -3,79 +3,89 @@ library(magrittr)
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args) < 3){
-  stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord_file> <profile_info_file> <out_file>", call.=FALSE)
+  stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord.bed> <trna_hits.bed> <profile_info_file> <out_file>", call.=FALSE)
 }
 hit_file <- args[1]
 pos_file <- args[2]
-meta_file <- args[3]
-out_file <- args[4]
-#hit_file <- "analysis/pici/finder_test/test.hits.tsv"
-#pos_file <- "analysis/pici/finder_test/test.proteinPos.tsv"
-#out_file <- "analysis/pici/finder_test/test.clusters.tsv"
-
-max_dist <- 20000
-min_size <- 2
-max_initial_dist <- 4000
+trna_file <- args[3]
+meta_file <- args[4]
+out_file <- args[5]
 
 hits <- read_tsv(hit_file, col_names=c('profile','protein_id','hmmer_evalue','hmmer_score'))
-pos <- read_tsv(pos_file,c('contig_id','protein_id','pos','len','strand'))
+pos <- read_tsv(pos_file,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
 meta <- read_tsv(meta_file)
+tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
 
-# try pre-filtering (keep all integrases, other genes only if there is another hit within max_initial_dist (e.g. 5000))
 hitpos <- left_join(hits,pos) %>% left_join(meta)
-hitpos %<>% group_by(contig_id) %>%
-  arrange(contig_id,pos) %>%
-  mutate(
-    end=pos+len,
-    prev_end=lag(end,default=-Inf),
-    next_start=lead(pos,default=+Inf),
-    closest=pmin(pos-prev_end,next_start-end)
-  ) %>%
-  filter(class=="int" | closest<=max_initial_dist) %>%
-  ungroup %>%
-  select(profile,protein_id,hmmer_evalue,hmmer_score,contig_id,pos,len,strand,class,score,length)
 
-clusters <- hitpos %>%
-    group_by(contig_id) %>%
-    arrange(pos) %>%
-    # mutate(diff=c(0,diff(pos)),large_gap=if_else(diff>max_dist,1,0),cluster_id=paste(contig_id,cumsum(large_gap),sep="_cls")) %>%
-    mutate(end=pos+len,prev_end=lag(end,default=0),diff=pos-prev_end,large_gap=if_else(diff>max_dist,1,0),cluster_id=paste(contig_id,cumsum(large_gap),sep="_cls")) %>%
-    add_count(cluster_id) %>%
-    filter(n>=min_size) %>%
-    select(-prev_end,-large_gap) %>%
-    arrange(contig_id,cluster_id)
-
-# subclustering by int (incl. direction) - not generic enough
-#clusters %<>% group_by(cluster_id) %>%
-#  mutate(
-#    int = if_else(class=="int",1,0),
-#    subcluster=cumsum(int),
-#    intflip=if_else(int==1 & strand=="-",1,0),
-#    subcluster=subcluster-intflip
-#  ) %>%
-#  ungroup %>%
-#  mutate(cluster_id=paste(cluster_id,subcluster,sep="_"))
-
-score <- function(cluster){
-  score_sum <- cluster %>% group_by(class) %>% slice(which.max(lencor_score)) %>% pull(lencor_score) %>% sum
-  cluster$cluster_score <- score_sum
-  cluster
+integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, downstreamRange=25000, minLen=5000){
+  integrase <- filter(hitpos, protein_id==proteinId)
+  score <- 0
+  upstreamType <- "None"
+  downstreamType <- "None"
+  hits_in_range <- tibble()
+  if(integrase$strand == "+"){
+    upstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start-upstreamRange, end<=integrase$start) %>% top_n(1, start)
+    hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, end>=integrase$start-upstreamRange, end<=integrase$end+downstreamRange)
+    if(nrow(upstream_trna)!=0){
+      startPos <- upstream_trna$start
+      upstreamType <- str_c(upstream_trna$type,"-",upstream_trna$full)
+      score <- score + 5
+    } else {
+      startPos <- min(hits_in_range$start)
+    }
+    endPos <- integrase$end + minLen
+    downstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start, end<=integrase$end+downstreamRange) %>% top_n(-1, start)
+    if(nrow(downstream_trna)!=0){
+      endPos <- downstream_trna$end
+      downstreamType <- str_c(downstream_trna$type,"-",downstream_trna$full)
+      score <- score + 2
+    } else {
+      endPos <- max(endPos, max(hits_in_range$end))
+    }
+  } else {
+    upstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$end, end<=integrase$end+upstreamRange) %>% top_n(-1, start)
+    hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, start>=integrase$start-downstreamRange, start<=integrase$end+upstreamRange)
+    if(nrow(upstream_trna)!=0){
+      endPos <- upstream_trna$end
+      upstreamType <- str_c(upstream_trna$type,"-",upstream_trna$full)
+      score <- score + 5
+    } else {
+      endPos <- max(hits_in_range$end)
+    }
+    startPos <- integrase$start - minLen
+    downstream_trna <- tRNAs %>% filter(contig_id==integrase$contig_id, start>=integrase$start-downstreamRange, end<=integrase$end) %>% top_n(1, start)
+    if(nrow(downstream_trna)!=0){
+      startPos <- downstream_trna$start
+      downstreamType <- str_c(downstream_trna$type,"-",downstream_trna$full)
+      score <- score + 2
+    } else {
+      startPos <- min(startPos, min(hits_in_range$start))
+    }
+  }
+  hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, end>=startPos, start<=endPos)
+  score <- score + nrow(hits_in_range) + length(unique(hits_in_range$class))
+  return(tibble(id=integrase$protein_id, start=startPos, upstreamType, end=endPos, downstreamType, strand=integrase$strand, score, contig_id = integrase$contig_id))
 }
 
-scored_clusters <- clusters %>%
-  group_by(cluster_id) %>%
-  mutate(
-    length_deviation=1+abs(len/3-length)/length,
-    lencor_score=score/length_deviation, # correct scores for length deviation
-    diff=lead(diff), #remove first diff (not meaningful, distance to previous cluster)
-    median_dist=median(diff,na.rm=TRUE),
-    median_dist=if_else(median_dist<0,0.0,median_dist)
-  ) %>%
-  split(.$cluster_id) %>%
-  map_df(score) %>%
-  mutate(
-    distcor_cluster_score=cluster_score*(max_dist-median_dist)/max_dist
-  ) %>%
-  arrange(-distcor_cluster_score, -n, cluster_id, pos)
+flag_lower_scoring_overlap <- function(clusters){
+  require(plyranges)
+  loosers <- clusters %>%
+    as_granges(seqnames=contig_id) %>%
+    join_overlap_self(maxgap=0, minoverlap=100) %>%
+    filter(id != id.overlap, score != score.overlap) %>%
+    mutate(looser = if_else(score<score.overlap, id, id.overlap)) %>%
+    as_tibble %>%
+    pull(looser) %>%
+    unique
+  return(clusters$id %in% loosers)
+}
 
+scored_clusters <- hitpos %>%
+  filter(class=="int") %>%
+  pull(protein_id) %>%
+  map_df(integrase_to_element,hitpos,tRNAs) %>%
+  mutate(secondary=flag_lower_scoring_overlap(.)) %>%
+  arrange(secondary,-score)
 write_tsv(scored_clusters,out_file)
+
