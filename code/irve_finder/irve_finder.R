@@ -32,7 +32,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
       upstreamType <- str_c(upstream_trna$type,"-",upstream_trna$full)
       score <- score + 5
     } else {
-      startPos <- min(hits_in_range$start)
+      startPos <- min(c(integrase$start, hits_in_range %>% filter(class != "int") %>% pull(start)))
     }
     endPos <- integrase$end + minLen
     downstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start, end<=integrase$end+downstreamRange) %>% top_n(-1, start)
@@ -51,7 +51,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
       upstreamType <- str_c(upstream_trna$type,"-",upstream_trna$full)
       score <- score + 5
     } else {
-      endPos <- max(hits_in_range$end)
+      endPos <- max(c(integrase$end, hits_in_range %>% filter(class != "int") %>% pull(end)))
     }
     startPos <- integrase$start - minLen
     downstream_trna <- tRNAs %>% filter(contig_id==integrase$contig_id, start>=integrase$start-downstreamRange, end<=integrase$end) %>% top_n(1, start)
@@ -72,7 +72,7 @@ flag_lower_scoring_overlap <- function(clusters){
   require(plyranges)
   loosers <- clusters %>%
     as_granges(seqnames=contig_id) %>%
-    join_overlap_self(maxgap=0, minoverlap=100) %>%
+    join_overlap_self(maxgap=-1L, minoverlap=100L) %>%
     filter(id != id.overlap, score != score.overlap) %>%
     mutate(looser = if_else(score<score.overlap, id, id.overlap)) %>%
     as_tibble %>%

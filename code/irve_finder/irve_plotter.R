@@ -29,8 +29,8 @@ genes_0 <- read_tsv(gene_file, col_names=c("contig_id", "start", "end", "protein
   mutate(length = end - start + 1)
   
 # elements
-element_0 <- read_tsv(element_file) #%>%
-#  filter(!secondary)
+element_0 <- read_tsv(element_file) %>%
+  filter(!secondary)
 
 element_bounds <- element_0 %>%
   transmute(
@@ -43,7 +43,8 @@ element_bounds <- element_0 %>%
   )
 
 element_1 <- element_0 %>%
-  select(genome_id=id, contig_id, start, end, strand, score, secondary)
+  select(genome_id=id, contig_id, start, end, strand, score, secondary) %>%
+  mutate(genome_id=str_replace_all(genome_id,"-","_"))
 
 # filter down to genes in/next to elements
 # element_id => genome_id for plotting!
@@ -113,7 +114,7 @@ cluster_order <- contigs_0 %>% pull(genome_id) %>% paste0("$")
 tRNAs_0 <- read_tsv(tRNA_file, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
 tRNAs_1 <- contigs_0 %>% select(genome_id, contig_id) %>% unique %>%
   left_join(tRNAs_0, by=c("contig_id")) %>%
-  mutate(type = str_replace(type, "tRNA-", ""))
+  mutate(type = str_replace(type, "tRNA-", ""), strand=if_else(strand %in% c('+','-'), strand, '.'))
 
 #------------------------------------------------------------------------------
 # gaps
@@ -130,7 +131,7 @@ flip <- genes_3 %>%
     filter(protein_id == gene_focus & strand == "-") %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
-pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre", "pre_evalue", "strand"))
+pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
 pre1_1 <- contigs_0 %>% select(genome_id, contig_id) %>% unique %>% left_join(pre1_0)
 
 plot_contig_data <- function(contig_data, title){
@@ -184,6 +185,6 @@ plot_contig_data_pages <- function(contig_data, title, genomes_per_page=20){
   return(gg_pages)
 }
 
-png(out_file, title="IRVEs", width=20, height=14, units = 'in', res = 300)
+pdf(out_file, title="IRVEs", width=20, height=14)
 plot_contig_data_pages(contigs_0, "IRVEs")
 dev.off()
