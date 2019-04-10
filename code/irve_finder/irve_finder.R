@@ -36,7 +36,8 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
     }
     endPos <- integrase$end + minLen
     downstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start, end<=integrase$end+downstreamRange) %>% top_n(-1, start)
-    if(nrow(downstream_trna)!=0){
+    # only consider downstream_trna if upsteam_trna was found as well
+    if(nrow(upsteam_trna)!=0 && nrow(downstream_trna)!=0){
       endPos <- downstream_trna$end
       downstreamType <- str_c(downstream_trna$type,"-",downstream_trna$full)
       score <- score + 2
@@ -55,7 +56,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
     }
     startPos <- integrase$start - minLen
     downstream_trna <- tRNAs %>% filter(contig_id==integrase$contig_id, start>=integrase$start-downstreamRange, end<=integrase$end) %>% top_n(1, start)
-    if(nrow(downstream_trna)!=0){
+    if(nrow(upsteam_trna)!=0 && nrow(downstream_trna)!=0){
       startPos <- downstream_trna$start
       downstreamType <- str_c(downstream_trna$type,"-",downstream_trna$full)
       score <- score + 2
