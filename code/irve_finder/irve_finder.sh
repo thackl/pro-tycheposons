@@ -1,4 +1,4 @@
-#!/usr/env/bin bash
+#!/usr/bin/env bash
 set -e 
 
 PROTEINS_FA=$1
@@ -11,14 +11,14 @@ PRE_HMM=$7
 TRNA_FA=$8
 PREFIX=$9
 
-RSCRIPT_BIN=/nix/store/nlmcmfzv9k8lvbwnlazjncwzafq0hj7f-R-3.5.3-wrapper/bin/Rscript
-SCRIPT_DIR=/tank/home/s216121/PostDoc/prochlorococcusIntegrase/docs/IRVE-manuscript/code/irve_finder
+RSCRIPT_BIN=Rscript
+SCRIPT_DIR="${BASH_SOURCE%/*}"
 
 echo "Extracting features from gff"
-#cat $REF_GFF | ~/software/seq-scripts/bin/gff2bed --feature CDS >$PREFIX.cds.bed
-#cat $REF_GFF | ~/software/seq-scripts/bin/gff2bed --feature gap >$PREFIX.gap.bed
-#cat $REF_GFF | ~/software/seq-scripts/bin/gff2bed --feature tRNA >$PREFIX.tRNA.bed
-#cat $REF_GFF | ~/software/seq-scripts/bin/gff2bed --feature tmRNA >>$PREFIX.tRNA.bed
+cat $REF_GFF | gff2bed --feature CDS >$PREFIX.cds.bed
+cat $REF_GFF | gff2bed --feature gap >$PREFIX.gap.bed
+cat $REF_GFF | gff2bed --feature tRNA >$PREFIX.tRNA.bed
+cat $REF_GFF | gff2bed --feature tmRNA >>$PREFIX.tRNA.bed
 
 echo "Searching for IRVE genes"
 if [ ! -f $IRVE_HMM.h3i ]
@@ -44,7 +44,7 @@ then
     hmmpress $PRE_HMM
 fi
 nhmmscan -o /dev/null --tblout $PREFIX.pre1.nhmmscan.tbl -E 1 $PRE_HMM $GENOME_FA
-cat $PREFIX.pre1.nhmmscan.tbl | ~/software/seq-scripts/bin/hmmer-tbl2tsv | tail -n+3 | tsv-select -f 3,7,8,13,12 >$PREFIX.pre1.hits.tsv
+cat $PREFIX.pre1.nhmmscan.tbl | hmmer-tbl2tsv | tail -n+3 | tsv-select -f 3,7,8,13,12 >$PREFIX.pre1.hits.tsv
 
 
 echo "Searching for (partial) tRNAs"
@@ -53,7 +53,7 @@ then
     makeblastdb -dbtype nucl -in $TRNA_FA
 fi
 blastn -num_threads 6 -task blastn -db $TRNA_FA -query $GENOME_FA -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -outfmt 7 >$PREFIX.tRNA.blastn.tsv
-cat $PREFIX.tRNA.blastn.tsv | ~/software/seq-scripts/bin/blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse |
+cat $PREFIX.tRNA.blastn.tsv | blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse |
   perl -ane '
     @scores = split(";", $F[6]);
     @trnas = split(";", $F[3]);

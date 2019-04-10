@@ -1,11 +1,8 @@
-#!/nix/store/nlmcmfzv9k8lvbwnlazjncwzafq0hj7f-R-3.5.3-wrapper/bin/Rscript
-
 library(tidyverse)
 library(devtools)
-source("~/projects/nix-shell-templates/R_helpers.R")
-local_library("thacklr",local_lib_path="~/PostDoc/prochlorococcusIntegrase/.local-r-lib")
-local_library("patchwork",local_lib_path="~/PostDoc/prochlorococcusIntegrase/.local-r-lib")
-local_library("gggenomes",local_lib_path="~/PostDoc/prochlorococcusIntegrase/.local-r-lib")
+library(thacklr)
+library(patchwork)
+library(gggenomes)
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args) < 3){
