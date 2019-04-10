@@ -26,7 +26,6 @@ then
     hmmpress $IRVE_HMM
 fi
 hmmsearch --cpu 4 --tblout $PREFIX.irve.hmmsearch.tbl -o /dev/null $IRVE_HMM $PROTEINS_FA
-# cat $PREFIX.irve.hmmscan.tbl | hmmer-tbl2tsv | tail -n+3 | cut -f1,3,5,6 | tsv-uniq -f2 >$PREFIX.irve.hits.tsv
 cat $PREFIX.irve.hmmsearch.tbl | hmmer-tbl2tsv | tail -n+3 | cut -f1,3,5,6 >$PREFIX.irve.hits.tsv
 
 
@@ -35,7 +34,7 @@ if [ ! -f $VIR_HMM.h3i ]
 then
     hmmpress $VIR_HMM
 fi
-#hmmsearch --cpu 4 --tblout $PREFIX.virsorter.hmmsearch.tbl -o /dev/null $VIR_HMM $PROTEINS_FA
+hmmsearch --cpu 4 --tblout $PREFIX.virsorter.hmmsearch.tbl -o /dev/null $VIR_HMM $PROTEINS_FA
 cat $PREFIX.virsorter.hmmsearch.tbl | hmmer-tbl2tsv | tail -n+3 | cut -f1,3,5,6 | sort -k4,4nr | tsv-uniq -f1 >$PREFIX.virsorter.hits.tsv
 
 
