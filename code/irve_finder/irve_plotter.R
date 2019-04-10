@@ -51,10 +51,10 @@ genes_1 <- left_join(genes_0, element_bounds) %>%
            mutate(genome_id=str_replace_all(element_id,"-","_"))
 
 # hits
-hits_0 <- read_tsv(v5_hit_file, col_names=c("profile","protein_id","hmmer_evalue","hmmer_score"))
+hits_0 <- read_tsv(v5_hit_file, col_names=c("protein_id","profile","hmmer_evalue","hmmer_score"))
 
 # virus hits
-virus_hits_0 <- read_tsv(virus_file, col_names=c("virus_profile","protein_id","virus_evalue","virus_score"))
+virus_hits_0 <- read_tsv(virus_file, col_names=c("protein_id","virus_profile","virus_evalue","virus_score"))
 
 # now clusters contain all gene - flanking, w/ and w/o hit
 genes_2 <- left_join(genes_1, hits_0) %>%
@@ -157,12 +157,13 @@ plot_contig_data <- function(contig_data, title){
     geom_gene(aes(fill=class), color="grey50", arrowhead_width=grid::unit(3,"mm"),
               arrowhead_height=grid::unit(3,"mm"),
               arrow_body_height=grid::unit(3,"mm")) +
+    geom_text(aes((x+xend)/2, y=y-.3, label=profile), use(genes), angle=30, hjust=0, vjust=1, size=3) +
     # score
     geom_text(aes(-2500,y+.5,label=format(cluster_score,digits=3)), use(contigs)) +
-    geom_text(aes((x+xend)/2, y=y-.3, label=type), use(tRNAs), angle=30, hjust=0, vjust=1, size=3) +            
     # tRNAs and PRE1
     geom_feature(data=use(tRNAs, full=="partial"), size=5, color="blue") +
     geom_feature(data=use(tRNAs, full=="full"), size=5, color="red") +
+    geom_text(aes((x+xend)/2, y=y-.3, label=type), use(tRNAs), angle=30, hjust=0, vjust=1, size=3) +
     #geom_feature(data=use(tRNAs, type=="tmRNA"), size=5, color="darkorchid") +
     geom_segment(aes(x=x, xend=x, y=y-.40, yend=y-.10), data=use(PRE1), arrow=arrow(length=unit(.15,"cm"), type="closed"), linejoin='mitre', size=.5, color="darkgreen") +
     scale_fill_manual(values=class_colors) +

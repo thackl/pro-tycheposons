@@ -11,7 +11,7 @@ trna_file <- args[3]
 meta_file <- args[4]
 out_file <- args[5]
 
-hits <- read_tsv(hit_file, col_names=c('profile','protein_id','hmmer_evalue','hmmer_score'))
+hits <- read_tsv(hit_file, col_names=c('protein_id','profile','hmmer_evalue','hmmer_score'))
 pos <- read_tsv(pos_file,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
 meta <- read_tsv(meta_file)
 tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
@@ -64,7 +64,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
     }
   }
   hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, end>=startPos, start<=endPos)
-  score <- score + nrow(hits_in_range) + length(unique(hits_in_range$class))
+  score <- score + length(unique(hits_in_range$protein_id)) + length(unique(hits_in_range$class))
   return(tibble(id=integrase$protein_id, start=startPos, upstreamType, end=endPos, downstreamType, strand=integrase$strand, score, contig_id = integrase$contig_id))
 }
 
