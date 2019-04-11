@@ -19,7 +19,8 @@ tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 's
 hitpos <- left_join(hits,pos) %>% left_join(meta)
 
 integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, downstreamRange=25000, minLen=5000){
-  integrase <- filter(hitpos, protein_id==proteinId)
+  integrase <- filter(hitpos, protein_id==proteinId) %>%
+    arrange(hmmer_evalue) %>% head(n=1) # top hit per int
   score <- 0
   upstreamType <- "None"
   downstreamType <- "None"
@@ -36,8 +37,8 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
     }
     endPos <- integrase$end + minLen
     downstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start, end<=integrase$end+downstreamRange) %>% top_n(-1, start)
-    # only consider downstream_trna if upsteam_trna was found as well
-    if(nrow(upsteam_trna)!=0 && nrow(downstream_trna)!=0){
+    # only consider downstream_trna if upstream_trna was found as well
+    if(nrow(upstream_trna)!=0 && nrow(downstream_trna)!=0){
       endPos <- downstream_trna$end
       downstreamType <- str_c(downstream_trna$type,"-",downstream_trna$full)
       score <- score + 2
@@ -56,7 +57,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
     }
     startPos <- integrase$start - minLen
     downstream_trna <- tRNAs %>% filter(contig_id==integrase$contig_id, start>=integrase$start-downstreamRange, end<=integrase$end) %>% top_n(1, start)
-    if(nrow(upsteam_trna)!=0 && nrow(downstream_trna)!=0){
+    if(nrow(upstream_trna)!=0 && nrow(downstream_trna)!=0){
       startPos <- downstream_trna$start
       downstreamType <- str_c(downstream_trna$type,"-",downstream_trna$full)
       score <- score + 2
@@ -82,11 +83,16 @@ flag_lower_scoring_overlap <- function(clusters){
   return(clusters$id %in% loosers)
 }
 
-scored_clusters <- hitpos %>%
-  filter(class=="int") %>%
-  pull(protein_id) %>%
-  map_df(integrase_to_element,hitpos,tRNAs) %>%
+int_ids <- hitpos %>%
+  filter(class %in% c("Serine-Recombinase", "Tyrosine-Recombinase")) %>%
+  pull(protein_id) %>% unique
+
+scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,tRNAs)
+
+scored_clusters_1 <- scored_clusters_0 %>%
   mutate(secondary=flag_lower_scoring_overlap(.)) %>%
   arrange(secondary,-score)
-write_tsv(scored_clusters,out_file)
 
+write_tsv(scored_clusters_1,out_file)
+
+warnings()
