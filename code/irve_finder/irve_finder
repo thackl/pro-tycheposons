@@ -155,7 +155,11 @@ sub gather_annotations{
         run(qq(hmmer-tbl2tsv $file > $out/$pre.$suf.tbl.tsv));
         $file = "$out/$pre.$suf.tbl.tsv";
     }
-    run(qq(tail -n+1 $file | cut -f1,3,5,6 > $out/$pre.$suf.tsv));
+    if($nuc){
+        run(qq(tail -n+2 $file | tsv-select -f3,7,8,13,12 > $out/$pre.$suf.tsv));
+    } else {
+        run(qq(tail -n+2 $file | cut -f1,3,5,6 > $out/$pre.$suf.tsv));
+    }
     return "$out/$pre.$suf.tsv";
 }
 
