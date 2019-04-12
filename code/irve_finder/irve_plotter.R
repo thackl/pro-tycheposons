@@ -68,10 +68,10 @@ genes_2 <- left_join(genes_1, hits_0) %>%
   mutate(set = str_match(profile, "_([^-]+)$")[,2]) %>%
   left_join(virus_hits_0, by=c("protein_id"))
 
-print(genes_2)
-genes_2 %<>% split(.$element_id) %>%
-  keep(~any(str_detect(.x$profile, "alpA"), na.rm=TRUE)) %>%
-  bind_rows
+#print(genes_2)
+#genes_2 %<>% split(.$element_id) %>%
+#  keep(~any(str_detect(.x$profile, "alpA"), na.rm=TRUE)) %>%
+#  bind_rows
 
 ## colors ----------------------------------------------------------------------
 print("hi")
