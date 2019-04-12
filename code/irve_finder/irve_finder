@@ -7,6 +7,7 @@ use strict;
 use Getopt::Long  qw(:config no_ignore_case bundling);
 use Data::Dumper;
 use FindBin qw($RealBin);
+use List::Util qw(min max);
 
 GetOptions (
     "out-dir|o=s" => \(my $out = "irve_finder"),
@@ -85,6 +86,7 @@ my $virus_hits = gather_annotations($virus_file, "virus.hits", $faa_file) if $vi
 my $pre1_hits = gather_annotations($pre1_file, "pre1.nhmmscan.hits", $fna_file, 1) if $pre1_file;
 
 print STDERR "\nSearching for (partial) tRNAs\n";
+$trna_file && -z $trna_bed && predict_trnas();
 my $trna_hits = gather_trnas($trna_file) if $trna_file;
 
 print STDERR "\nDetecting IRVE elements\n";
@@ -183,4 +185,93 @@ sub run{
     print "+ $cmd\n" if $print;
     my $log = qx($cmd);
     die $log, "\nDo'h, something went wrong" if $?;
+}
+
+sub get_seq_lengths{
+    my ($file) = @_;
+    open(FAI, "-|", "samtools faidx $file; cat $file.fai") or die $!;
+    my %S;
+    while (<FAI>) {
+        my ($id,$len, $foo) = split("\t", $_, 3);
+        $S{$id} = $len;
+    }
+    return \%S;
+}
+
+# use aragorn, parser from Torsten Seemanns PROKKA
+sub predict_trnas{
+    #print STDERR "\nPredicting tRNAs and tmRNAs\n";
+    my $seq_len = get_seq_lengths($fna_file);
+
+    my $ver = qx(aragorn -h | grep -oPm1 "ARAGORN v\\K\\S+");
+    die $ver if $?;
+    chomp($ver);
+
+    open(TRNAOUT, ">", $trna_bed) or die $!;
+
+    # -l : Assume that each sequence has a linear topology. Search does not wrap
+    # -w : batch mode
+    my $cmd = "aragorn -l -gcstd -w $fna_file"; # -t/-m
+    print STDERR "+ $cmd\n";
+    my $num_trna=0;
+    open TRNA, '-|', $cmd;
+    my $sid;
+    while (<TRNA>) {
+        chomp;
+        if (m/^>(\S+)/) {
+            $sid = $1;
+            next;
+        }
+        my @x = split m/\s+/;
+        next unless @x == 5 and $x[0] =~ m/^\d+$/;
+        if ($x[1] =~ m/\?/) {
+            msg("tRNA $x[2] is a pseudo/wacky gene - skipping.\n");
+            next;
+        }
+        #msg("@x");
+        # in linear mode (-l) we can get -ve coordinates
+        $x[2] =~ m/(c)?\[-?(\d+),(\d+)\]/;
+        my($revcom, $start, $end) = ($1,$2,$3);
+
+        # bug fix for aragorn when revcom trna ends at start of contig!
+        #  if (defined $revcom and $start > $end) {
+        #    msg("Activating kludge for Aragorn bug for tRNA end at contig start");
+        #    $start = 1;
+        #  }
+        if ($start > $end) {
+            msg("tRNA $x[2] has start($start) > end ($end) - skipping.");
+            next;
+        }
+
+        # correct strange coordinates in -l mode
+        $start = max( $start, 1 );
+        $end = min( $end, $seq_len->{$sid} );
+
+        if (abs($end-$start) > 500) {
+            msg("tRNA/tmRNA $x[2] is too big (>500bp) - skipping.");
+            next;
+        }
+        # end kludge
+        $num_trna++;
+
+        my $ftype = 'tRNA';
+        my $product = $x[1].$x[4];
+        my @gene = ();
+        if ($x[1] =~ m/^(tmRNA)/) {
+            $ftype = $1;
+            $product = "transfer-messenger RNA, SsrA";
+            @gene = ('gene' => 'ssrA')
+        }
+
+        print TRNAOUT join("\t", $sid, $start-1, $end-1, $product, ".", $revcom ? "-" : "+", "Aragorn:$ver", $ftype), "\n";
+    }
+    print STDERR "Found $num_trna tRNAs\n";
+    close TRNA;
+    close TRNAOUT;
+    return $trna_bed;
+}
+
+sub msg{
+    my ($msg) = @_;
+    print STDERR $msg."\n";
 }
