@@ -11,14 +11,15 @@ trna_file <- args[3]
 meta_file <- args[4]
 out_file <- args[5]
 
-hits <- read_tsv(hit_file, col_names=c('protein_id','profile','hmmer_evalue','hmmer_score'))
+hits_0 <- read_tsv(hit_file, col_names=c('protein_id','profile_id','hmmer_evalue','hmmer_score'))
+hits_1 <- hits_0 %>% group_by(protein_id) %>% arrange(-hmmer_score) %>% summarize_all(first)
 pos <- read_tsv(pos_file,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
 meta <- read_tsv(meta_file)
 tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
 
-hitpos <- left_join(hits,pos) %>% left_join(meta)
+hitpos <- left_join(hits_1,pos) %>% left_join(meta)
 
-integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, downstreamRange=25000, minLen=5000){
+integrase_to_element <- function(proteinId, hitpos, tRNAs, targetFunctions, upstreamRange=1000, downstreamRange=25000, minLen=5000){
   integrase <- filter(hitpos, protein_id==proteinId) %>%
     arrange(hmmer_evalue) %>% head(n=1) # top hit per int
   score <- 0
@@ -33,7 +34,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
       upstreamType <- str_c(upstream_trna$type,"-",upstream_trna$full)
       score <- score + 5
     } else {
-      startPos <- min(c(integrase$start, hits_in_range %>% filter(class != "int") %>% pull(start)))
+      startPos <- min(c(integrase$start, hits_in_range %>% filter(!(`function` %in% targetFunctions)) %>% pull(start)))
     }
     endPos <- integrase$end + minLen
     downstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start, end<=integrase$end+downstreamRange) %>% top_n(-1, start)
@@ -53,7 +54,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
       upstreamType <- str_c(upstream_trna$type,"-",upstream_trna$full)
       score <- score + 5
     } else {
-      endPos <- max(c(integrase$end, hits_in_range %>% filter(class != "int") %>% pull(end)))
+      endPos <- max(c(integrase$end, hits_in_range %>% filter(!(`function` %in% targetFunctions)) %>% pull(end)))
     }
     startPos <- integrase$start - minLen
     downstream_trna <- tRNAs %>% filter(contig_id==integrase$contig_id, start>=integrase$start-downstreamRange, end<=integrase$end) %>% top_n(1, start)
@@ -66,7 +67,8 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, upstreamRange=1000, d
     }
   }
   hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, end>=startPos, start<=endPos)
-  score <- score + length(unique(hits_in_range$protein_id)) + length(unique(hits_in_range$class))
+  # TODO: use scores from meta
+  score <- score + length(unique(hits_in_range$protein_id)) + length(unique(hits_in_range$`function`))
   return(tibble(id=integrase$protein_id, start=startPos, upstreamType, end=endPos, downstreamType, strand=integrase$strand, score, contig_id = integrase$contig_id))
 }
 
@@ -83,11 +85,12 @@ flag_lower_scoring_overlap <- function(clusters){
   return(clusters$id %in% loosers)
 }
 
+target_functions <- c("Tyrosine-Recombinase", "Serine-Recombinase")
 int_ids <- hitpos %>%
-  filter(class %in% c("Serine-Recombinase", "Tyrosine-Recombinase")) %>%
+  filter(`function` %in% target_functions & irve_score > 0) %>%
   pull(protein_id) %>% unique
 
-scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,tRNAs)
+scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,tRNAs,target_functions)
 
 scored_clusters_1 <- scored_clusters_0 %>%
   mutate(secondary=flag_lower_scoring_overlap(.)) %>%
