@@ -85,47 +85,17 @@ my $virus_hits = gather_annotations($virus_file, "virus.hits", $faa_file) if $vi
 my $pre1_hits = gather_annotations($pre1_file, "pre1.nhmmscan.hits", $fna_file, 1) if $pre1_file;
 
 print STDERR "\nSearching for (partial) tRNAs\n";
-run(qq(makeblastdb -dbtype nucl -in $trna_file)) if $trna_file;
-my $trna_blast_tsv = "$out/$pre.tRNA.blastn.tsv";
-my $trna_blast_tmp = "$out/$pre.tRNA.blastn.tmp";
-my $trna_blast_bed = "$out/$pre.tRNA.blastn.bed";
-my $trna_part = "$out/$pre.tRNA.partial.bed";
-my $trna_full = "$out/$pre.tRNA.full.bed";
-my $trna_hits = "$out/$pre.tRNA.hits.bed";
+my $trna_hits = gather_trnas($trna_file) if $trna_file;
 
-run(qq(blastn -num_threads $threads -task blastn -db $trna_file -query $fna_file -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -outfmt 7 >$trna_blast_tsv));
-run(qq(cat $trna_blast_tsv | blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse >$trna_blast_tmp));
-
-open(TMP, $trna_blast_tmp) or die $!;
-open(BED, ">$trna_blast_bed") or die $!;;
-while (<TMP>) {
-    my @F= split("\t", $_);
-    my @scores = split(";", $F[6]);
-    my @trnas = split(";", $F[3]);
-    my @idx = sort{$scores[$b] <=> $scores[$a]}0..$#scores;
-    @idx = grep{$scores[$_] == $scores[$idx[0]]}@idx; # max index with ties
-    print BED join("\t", @F[0..2], join(",", do { my %seen; grep { !$seen{$_}++ } map {(split("\\|"))[2]} @trnas[@idx]}), @F[4,5], join(";", @scores[@idx])), "\n";
-}
-close(TMP);
-close(BED);
-    
-run(qq(bedtools intersect -wb -v -f .9 -a $trna_blast_bed -b $trna_bed >$trna_part));
-run(qq(bedtools intersect -wb -f .9 -a $trna_blast_bed -b $trna_bed >$trna_full));
-run(qq(cut -f 1-6 $trna_full | perl -pe 's/\$/\tfull/' >$trna_hits));
-run(qq(cut -f1-6 $trna_part | perl -pe 's/\$/\tpartial/' >>$trna_hits));
-
-
-
+print STDERR "\nDetecting IRVE elements\n";
 my $irve_tsv = "$out/$pre.scored_clusters.tsv";
 my $irve_pdf = "$out/$pre.scored_clusters.pdf";
-print STDERR "Detecting IRVE elements\n";
-run(qq(Rscript $RealBin/irve_finder.R $irve_hits $cds_bed $trna_bed $irve_info_file $irve_tsv));
+run(qq(Rscript $RealBin/irve_finder.R $irve_hits $cds_bed $trna_hits $irve_info_file $irve_tsv 2>&1), 1);
 
 print STDERR "\nPlotting results\n";
-run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $trna_bed $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_pdf), 1);
+run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $trna_hits $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_info_file $irve_pdf 2>&1), 1);
 
-
-
+print STDERR "\nFinal cluster: $irve_tsv\nFinal plots:   $irve_pdf\n";
 
 #------------------------------------------------------------------------------#
 sub get_faa_from_gff{
@@ -171,10 +141,46 @@ sub extract_features{
     return "$out/$pre.$suf.bed";
 }
 
+sub gather_trnas{
+    my ($trna_file) = @_;
+    return $trna_file if $trna_file =~ /bed$/; # assume precomputed
+
+    run(qq(makeblastdb -dbtype nucl -in $trna_file)) if $trna_file;
+    my $trna_blast_tsv = "$out/$pre.tRNA.blastn.tsv";
+    my $trna_blast_tmp = "$out/$pre.tRNA.blastn.tmp";
+    my $trna_blast_bed = "$out/$pre.tRNA.blastn.bed";
+    my $trna_part = "$out/$pre.tRNA.partial.bed";
+    my $trna_full = "$out/$pre.tRNA.full.bed";
+    my $trna_hits = "$out/$pre.tRNA.hits.bed";
+
+    run(qq(blastn -num_threads $threads -task blastn -db $trna_file -query $fna_file -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -outfmt 7 >$trna_blast_tsv));
+    run(qq(cat $trna_blast_tsv | blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse >$trna_blast_tmp));
+
+    open(TMP, $trna_blast_tmp) or die $!;
+    open(BED, ">$trna_blast_bed") or die $!;;
+    while (<TMP>) {
+        my @F= split("\t", $_);
+        my @scores = split(";", $F[6]);
+        my @trnas = split(";", $F[3]);
+        my @idx = sort{$scores[$b] <=> $scores[$a]}0..$#scores;
+        @idx = grep{$scores[$_] == $scores[$idx[0]]}@idx; # max index with ties
+        print BED join("\t", @F[0..2], join(",", do { my %seen; grep { !$seen{$_}++ } map {(split("\\|"))[2]} @trnas[@idx]}), @F[4,5], join(";", @scores[@idx])), "\n";
+    }
+    close(TMP);
+    close(BED);
+
+    run(qq(bedtools intersect -wb -v -f .9 -a $trna_blast_bed -b $trna_bed >$trna_part));
+    run(qq(bedtools intersect -wb -f .9 -a $trna_blast_bed -b $trna_bed >$trna_full));
+    run(qq(cut -f 1-6 $trna_full | perl -pe 's/\$/\tfull/' >$trna_hits));
+    run(qq(cut -f1-6 $trna_part | perl -pe 's/\$/\tpartial/' >>$trna_hits));
+
+    return $trna_hits;
+}
+
+
 sub run{
     my($cmd, $print) = @_;
     print "+ $cmd\n" if $print;
     my $log = qx($cmd);
     die $log, "\nDo'h, something went wrong" if $?;
 }
-
