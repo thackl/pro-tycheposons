@@ -109,6 +109,49 @@ scored_clusters_1 <- scored_clusters_0 %>%
   mutate(secondary=flag_lower_scoring_overlap(.)) %>%
   arrange(secondary,-score)
 
-write_tsv(scored_clusters_1,out_file)
+get_no_int_clusters <- function(hitpos, existing_clusters, max_dist=5000, min_size=3){
+  # filter all hits that are on any existing cluster
+  already_on_cluster <- join_overlap_inner(hitpos %>% as_granges(seqnames=contig_id), existing_clusters %>% as_granges(seqnames=contig_id)) %>%
+    as_tibble %>%
+    pull(protein_id) %>%
+    unique
+
+  remaining_hits <- hitpos %>% filter(! protein_id %in% already_on_cluster)
+
+  no_int_clusters <- remaining_hits %>%
+    group_by(contig_id) %>%
+    arrange(contig_id,start) %>%
+    mutate(
+      prev_end=lag(end,default=-Inf),
+      diff=start-prev_end,
+      large_gap=if_else(diff>max_dist,1,0),
+      cluster_id=paste(contig_id,cumsum(large_gap),sep="_cls")
+    ) %>%
+    add_count(cluster_id) %>%
+    filter(n>=min_size)
+
+  scored_no_int_clusters <- no_int_clusters %>%
+    group_by(cluster_id) %>%
+    summarize(
+      id=dplyr::first(protein_id, order_by=start),
+      start=min(start),
+      upstreamType="no_int", end=max(end),
+      downstreamType="no_int",
+      strand="+",
+      score=length(module)+length(unique(module)),
+      contig_id=dplyr::first(contig_id),
+      secondary=FALSE
+    ) %>%
+    ungroup %>%
+    select(-cluster_id)
+
+  return(scored_no_int_clusters)
+}
+
+no_int_clusters <- get_no_int_clusters(hitpos, scored_clusters_1)
+
+scored_clusters_2 <- bind_rows(scored_clusters_1, no_int_clusters)
+
+write_tsv(scored_clusters_2,out_file)
 
 warnings()
