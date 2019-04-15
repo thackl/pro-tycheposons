@@ -39,6 +39,7 @@ element_bounds <- element_0 %>%
     archetype=upstreamType,
     ele_start = start-cluster_flank_length,
     ele_end = end+cluster_flank_length,
+    ele_strand = strand
   )
 
 element_1 <- element_0 %>%
@@ -146,7 +147,7 @@ if(nrow(gaps_0) > 0){
 # flip - this impl only makes sense if we expect the integrase to be oriented inwards e.g. INT><PRI
 # SaPIs are INT<>PRI
 flip <- genes_3 %>%
-    filter(protein_id == gene_focus & strand == "-") %>%
+    filter(protein_id == gene_focus & ele_strand == "-") %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
 pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
