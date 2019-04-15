@@ -74,7 +74,6 @@ genes_2 <- left_join(genes_1, hits_0) %>%
 #  bind_rows
 
 ## colors ----------------------------------------------------------------------
-print("hi")
 meta_0 <- read_tsv(meta_file)
 profile_colors <- meta_0 %>% select(profile_id, plot_color) %>% deframe
 
@@ -129,8 +128,9 @@ cluster_order <- contigs_0 %>% pull(genome_id) %>% paste0("$")
 
 #------------------------------------------------------------------------------# tRNAs
 tRNAs_0 <- read_tsv(tRNA_file, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
-tRNAs_1 <- contigs_0 %>% select(genome_id, contig_id) %>% unique %>%
+tRNAs_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, ele_end) %>%
   left_join(tRNAs_0, by=c("contig_id")) %>%
+  filter(start>=ele_start, end<=ele_end) %>%
   mutate(type = str_replace(type, "tRNA-", ""), strand=if_else(strand %in% c('+','-'), strand, '.'))
 
 #------------------------------------------------------------------------------
@@ -138,8 +138,9 @@ tRNAs_1 <- contigs_0 %>% select(genome_id, contig_id) %>% unique %>%
 gaps_0 <- read_tsv(gap_file, col_names=c("contig_id", "start", "end", "gap_id", "score", "strand"))
 gaps_1 <- tibble(contig_id=character(0), genome_id=character(0), start=numeric(0), end=numeric(0), strand=character(0))
 if(nrow(gaps_0) > 0){
-  gaps_1 <- contigs_0 %>% select(genome_id, contig_id) %>% unique %>%
-    left_join(gaps_0, by=c("contig_id"))
+  gaps_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, ele_end) %>%
+    left_join(gaps_0, by=c("contig_id")) %>%
+    filter(start>=ele_start, end<=ele_end)
 }
 
 # flip - this impl only makes sense if we expect the integrase to be oriented inwards e.g. INT><PRI
@@ -149,7 +150,9 @@ flip <- genes_3 %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
 pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
-pre1_1 <- contigs_0 %>% select(genome_id, contig_id) %>% unique %>% left_join(pre1_0)
+pre1_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, ele_end) %>%
+  left_join(pre1_0, by=c("contig_id")) %>%
+  filter(start>=ele_start, end<=ele_end)
 
 plot_contig_data <- function(contig_data, title, genomes_per_page=20){
   gg <- gggenomes(contig_data, genes_3, scale = list("lab", limits=c(genomes_per_page+.5,.5))) %>%
