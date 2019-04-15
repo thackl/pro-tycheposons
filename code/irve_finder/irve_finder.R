@@ -26,7 +26,20 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, targetFunctions, upst
   upstreamType <- "None"
   downstreamType <- "None"
   hits_in_range <- tibble()
+  direction <- integrase$strand
+  # search for closest tRNA within 1kbp (if downstream - flip direction)
   if(integrase$strand == "+"){
+    downstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start, end<=integrase$end+1000) %>% top_n(-1, start)
+    if(nrow(downstream_trna)){
+      direction <- "-"
+    }
+  } else {
+    downstream_trna <- tRNAs %>% filter(contig_id==integrase$contig_id, start>=integrase$start-1000, end<=integrase$end) %>% top_n(1, start)
+    if(nrow(downstream_trna)){
+      direction <- "+"
+    }
+  }
+  if(direction == "+"){
     upstream_trna <- tRNAs %>% filter(contig_id == integrase$contig_id, start>=integrase$start-upstreamRange, end<=integrase$start) %>% top_n(1, start)
     hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, end>=integrase$start-upstreamRange, end<=integrase$end+downstreamRange)
     if(nrow(upstream_trna)!=0){
@@ -69,7 +82,7 @@ integrase_to_element <- function(proteinId, hitpos, tRNAs, targetFunctions, upst
   hits_in_range <- hitpos %>% filter(contig_id == integrase$contig_id, end>=startPos, start<=endPos)
   # TODO: use scores from meta
   score <- score + length(unique(hits_in_range$protein_id)) + length(unique(hits_in_range$`function`))
-  return(tibble(id=integrase$protein_id, start=startPos, upstreamType, end=endPos, downstreamType, strand=integrase$strand, score, contig_id = integrase$contig_id))
+  return(tibble(id=integrase$protein_id, start=startPos, upstreamType, end=endPos, downstreamType, strand=direction, score, contig_id = integrase$contig_id))
 }
 
 flag_lower_scoring_overlap <- function(clusters){
