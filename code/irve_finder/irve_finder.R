@@ -77,7 +77,7 @@ flag_lower_scoring_overlap <- function(clusters){
   loosers <- clusters %>%
     as_granges(seqnames=contig_id) %>%
     join_overlap_self(maxgap=-1L, minoverlap=100L) %>%
-    filter(id != id.overlap, score != score.overlap) %>%
+    filter(id < id.overlap) %>%
     mutate(looser = if_else(score<score.overlap, id, id.overlap)) %>%
     as_tibble %>%
     pull(looser) %>%
