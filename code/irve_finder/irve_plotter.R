@@ -5,7 +5,7 @@ library(patchwork)
 library(gggenomes)
 
 args = commandArgs(trailingOnly=TRUE)
-if(length(args) < 3){
+if(length(args) < 9){
   stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord.bed> <trna_hits.bed> <element_file> <gap.bed> <pre1.hits.bed> <virus.hits.tsv> <irve-info.tsv> <out.pdf>", call.=FALSE)
 }
 
@@ -46,9 +46,19 @@ element_1 <- element_0 %>%
   select(genome_id=id, contig_id, start, end, strand, score, secondary) %>%
   mutate(genome_id=str_replace_all(genome_id,"-","_"))
 
+contig_lengths <- bind_rows(select(genes_0, contig_id, end)) %>%
+  group_by(contig_id) %>%
+  summarize(len=max(end)+500)
+
 # filter down to genes in/next to elements
 # element_id => genome_id for plotting!
-genes_1 <- left_join(genes_0, element_bounds) %>%
+genes_1 <- left_join(genes_0, contig_lengths)
+genes_2 <- bind_rows(
+  mutate(genes_1, start=start-len, end=end-len),
+  genes_1,
+  mutate(genes_1, start=start+len, end=end+len)
+)
+genes_3 <- left_join(genes_2, element_bounds) %>%
   filter((start > ele_start & start < ele_end) |
            (end < ele_end & end > ele_start)) %>%
            mutate(genome_id=str_replace_all(element_id,"-","_"))
@@ -64,7 +74,7 @@ virus_hits_0 <- read_tsv(virus_file, col_names=c("protein_id","virus_profile","v
   summarize_all(first) # best hit only
 
 # now clusters contain all gene - flanking, w/ and w/o hit
-genes_2 <- left_join(genes_1, hits_0) %>%
+genes_4 <- left_join(genes_3, hits_0) %>%
   mutate(class = str_match(profile, "^([^_]+)")[,2]) %>%
   mutate(set = str_match(profile, "_([^-]+)$")[,2]) %>%
   left_join(virus_hits_0, by=c("protein_id"))
@@ -111,18 +121,26 @@ profile_colors <- meta_0 %>% select(profile_id, plot_color) %>% deframe
 
 ## focus & flip ----------------------------------------------------------------
 # add evalue bin
-genes_3 <- genes_2 %>%
+genes_5 <- genes_4 %>%
   mutate(
     gene_focus = str_replace(element_id, "AG_(...)_", "AG-\\1-"),
     evalue_bin = cut(hmmer_evalue, c(Inf,1,1e-1,1e-3,1e-10,-Inf), label=F))
 
 # dummy contigs, one per cluster
-contigs_0 <- genes_3 %>% group_by(genome_id, contig_id) %>%
+contigs_0 <- genes_5 %>% group_by(genome_id, contig_id) %>%
   summarize(
     length=max(end)+500,
     cluster_score=max(cluster_score, na.rm=T)
   ) %>% ungroup %>%  arrange(-cluster_score)# %>%
 #    mutate(plot_part = ceiling(1:n()/contigs_per_page))
+
+contig_lengths <- left_join(select(contigs_0, genome_id, contig_id),contig_lengths)
+contig_ends <- bind_rows(
+  select(contig_lengths, genome_id, contig_id) %>% mutate(start=0, end=0, strand="+"),
+  select(contig_lengths, genome_id, contig_id, start=len) %>% mutate(end=start, strand="+")
+) %>%
+  left_join(transmute(element_bounds, genome_id=str_replace_all(element_id,"-","_"), ele_start, ele_end)) %>%
+  filter(start>=ele_start, end<=ele_end)
 
 # order by score - add "$" as hotfix for reorder's partial matching
 cluster_order <- contigs_0 %>% pull(genome_id) %>% paste0("$")
@@ -146,7 +164,7 @@ if(nrow(gaps_0) > 0){
 
 # flip - this impl only makes sense if we expect the integrase to be oriented inwards e.g. INT><PRI
 # SaPIs are INT<>PRI
-flip <- genes_3 %>%
+flip <- genes_5 %>%
     filter(protein_id == gene_focus & ele_strand == "-") %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
@@ -156,10 +174,11 @@ pre1_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, 
   filter(start>=ele_start, end<=ele_end)
 
 plot_contig_data <- function(contig_data, title, genomes_per_page=20){
-  gg <- gggenomes(contig_data, genes_3, scale = list("lab", limits=c(genomes_per_page+.5,.5))) %>%
+  gg <- gggenomes(contig_data, genes_5, scale = list("lab", limits=c(genomes_per_page+.5,.5))) %>%
     add_features(tRNAs_1, "tRNAs") %>%
     add_features(element_1, "element") %>%
     add_features(gaps_1, "gaps") %>%
+    add_features(contig_ends, "contig_ends") %>%
     add_features(pre1_1, "PRE1")
   # adjust layout
   gg <- gg %>%
@@ -185,6 +204,8 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     geom_text(aes((x+xend)/2-100, y=y-.3, label=profile), use(genes), angle=30, hjust=0, vjust=1, size=3) +
     # score
     geom_text(aes(-2500,y+.5,label=format(cluster_score,digits=3)), use(contigs)) +
+    # contig start and end
+    geom_feature(aes(x=x, xend=x+100, y=y, yend=y), use(contig_ends), size=8, color="black") +
     # tRNAs and PRE1
     geom_feature(data=use(tRNAs, full=="partial"), size=5, color="blue") +
     geom_feature(data=use(tRNAs, full=="full"), size=5, color="red") +

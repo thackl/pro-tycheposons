@@ -22,7 +22,7 @@ meta <- read_tsv(meta_file)
 tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
 contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
   group_by(contig_id) %>%
-  summarize(len=max(end)+100)
+  summarize(len=max(end)+500)
 
 hitpos <- left_join(hits_1,pos) %>% left_join(meta)
 
@@ -36,7 +36,8 @@ integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targe
   hits_in_range <- tibble()
   trna_on_contig <- tRNAs %>% filter(contig_id == integrase$contig_id)
   hits_on_contig <- hitpos %>% filter(contig_id == integrase$contig_id)
-  if(contig_len < interpret_contig_as_circular_if_smaller_than){
+  is_circular <- contig_len < interpret_contig_as_circular_if_smaller_than
+  if(is_circular){
     trna_on_contig <- bind_rows(
       mutate(trna_on_contig, start=start-contig_len, end=end-contig_len),
       trna_on_contig,
@@ -100,6 +101,10 @@ integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targe
     } else {
       startPos <- min(startPos, min(hits_in_range$start))
     }
+  }
+  if(!is_circular){
+    startPos <- max(startPos, 0)
+    endPos <- min(endPos, contig_len)
   }
   hits_in_range <- hits_on_contig %>% filter(end>=startPos, start<=endPos)
   # TODO: use scores from meta
