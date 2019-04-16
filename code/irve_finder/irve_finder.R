@@ -105,6 +105,13 @@ integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targe
   if(!is_circular){
     startPos <- max(startPos, 0)
     endPos <- min(endPos, contig_len)
+  } else {
+    # make sure the element is no longer than the contig
+    if(direction == "+"){
+      endPos <- min(endPos, startPos + contig_len)
+    } else {
+      startPos <- max(startPos, endPos - contig_len)
+    }
   }
   hits_in_range <- hits_on_contig %>% filter(end>=startPos, start<=endPos)
   # TODO: use scores from meta
