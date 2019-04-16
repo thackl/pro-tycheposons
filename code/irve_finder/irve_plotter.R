@@ -147,7 +147,7 @@ cluster_order <- contigs_0 %>% pull(genome_id) %>% paste0("$")
 
 #------------------------------------------------------------------------------# tRNAs
 tRNAs_0 <- read_tsv(tRNA_file, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
-tRNAs_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, ele_end) %>%
+tRNAs_1 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
   left_join(tRNAs_0, by=c("contig_id")) %>%
   filter(start>=ele_start, end<=ele_end) %>%
   mutate(type = str_replace(type, "tRNA-", ""), strand=if_else(strand %in% c('+','-'), strand, '.'))
@@ -169,7 +169,7 @@ flip <- genes_5 %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
 pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
-pre1_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, ele_end) %>%
+pre1_1 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
   left_join(pre1_0, by=c("contig_id")) %>%
   filter(start>=ele_start, end<=ele_end)
 
