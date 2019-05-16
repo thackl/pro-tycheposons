@@ -15,7 +15,7 @@ GetOptions (
     "irve-info|x=s" => \(my $irve_info_file),
     "faa|a=s" => \(my $faa_file),
     "virus|v=s" => \(my $virus_file),
-    "trna|r=s" => (\my $trna_file),
+    "trna|r=s" => \(my $trna_file),
     "pre1=s" => \(my $pre1_file),
     "threads|t=i" => \(my $threads = 4),
     "help|h!" => \(my $help),
@@ -161,6 +161,7 @@ sub gather_trnas{
     open(TMP, $trna_blast_tmp) or die $!;
     open(BED, ">$trna_blast_bed") or die $!;;
     while (<TMP>) {
+        chomp();
         my @F= split("\t", $_);
         my @scores = split(";", $F[6]);
         my @trnas = split(";", $F[3]);

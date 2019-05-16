@@ -166,8 +166,8 @@ gaps_0 <- read_tsv(gap_file, col_names=c("contig_id", "start", "end", "gap_id", 
 gaps_1 <- tibble(contig_id=character(0), genome_id=character(0), start=numeric(0), end=numeric(0), strand=character(0))
 if(nrow(gaps_0) > 0){
   gaps_1 <- wrap_features_for_circular(gaps_0, contig_lengths)
-  gaps_1 <- element_bounds %>% select(genome_id=element_id, contig_id, ele_start, ele_end) %>%
-    left_join(gaps_0, by=c("contig_id")) %>%
+  gaps_1 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
+    left_join(gaps_1, by=c("contig_id")) %>%
     filter(start>=ele_start, end<=ele_end)
 }
 
@@ -200,7 +200,7 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     ggtitle(title) +
     # islands
     #geom_feature(aes(y=y+.30, yend=y+.30), data=use(islands), size=2, color="burlywood2") +
-    geom_feature(data=use(gaps), size=1.5, color="grey70") +
+    geom_feature(data=use(gaps), size=1.5, color="black") +
     geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, !secondary), size=2, color="cornflowerblue") +
     geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, secondary), size=2, color="pink") +
     # profile source & evalue
@@ -215,7 +215,8 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     # score
     geom_text(aes(-2500,y+.5,label=format(cluster_score,digits=3)), use(contigs)) +
     # contig start and end
-    geom_text(aes(x=(x+xend)/2, y=y), use(contig_ends), label="X", size=8, color="darkgreen") +
+    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.2, yend=y+.3), use(contig_ends), linetype=2, color="black", size=.2) +
+    geom_segment(aes(x=(x+xend)/2+2, xend=(x+xend)/2+2, y=y-.2, yend=y+.3), use(contig_ends), linetype=2, color="black", size=.2) +
     # tRNAs and PRE1
     geom_feature(data=use(tRNAs, full=="partial"), size=5, color="blue") +
     geom_feature(data=use(tRNAs, full=="full"), size=5, color="red") +

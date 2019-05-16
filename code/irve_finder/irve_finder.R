@@ -132,7 +132,7 @@ flag_lower_scoring_overlap <- function(clusters){
   return(clusters$id %in% loosers)
 }
 
-target_functions <- c("Tyrosine-Recombinase", "Serine-Recombinase")
+target_functions <- c("Tyrosine Recombinase", "Large Serine Recombinase", "Serine Recombinase")
 int_ids <- hitpos %>%
   filter(`function` %in% target_functions & irve_score > 0) %>%
   pull(protein_id) %>% unique
