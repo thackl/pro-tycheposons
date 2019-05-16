@@ -200,14 +200,14 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     ggtitle(title) +
     # islands
     #geom_feature(aes(y=y+.30, yend=y+.30), data=use(islands), size=2, color="burlywood2") +
-    geom_feature(data=use(gaps), size=1.5, color="black") +
-    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, !secondary), size=2, color="cornflowerblue") +
-    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, secondary), size=2, color="pink") +
+    geom_feature(data=use(gaps), size=1, color="black") +
+    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, !secondary), size=1, color="cornflowerblue") +
+    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, secondary), size=1, color="pink") +
     # profile source & evalue
     geom_point(aes((x+xend)/2, y+.20, alpha=virus_score), use(genes, !is.na(virus_score)), color="black") +
     #geom_point(aes((x+xend)/2, y+.3), use(genes, !is.na(set)), color="black", shape=21, size=2) +
     # genes
-    geom_gene(aes(fill=profile), color="grey50", arrowhead_width=grid::unit(3,"mm"),
+    geom_gene(aes(fill=profile), color="black", arrowhead_width=grid::unit(3,"mm"),
               arrowhead_height=grid::unit(3,"mm"),
               arrow_body_height=grid::unit(3,"mm")) +
     #geom_text(aes((x+xend)/2-100, y=y-.3, label=str_extract(profile, "^[^_]+")), use(genes), angle=30, hjust=0, vjust=1, size=3) +
@@ -215,8 +215,7 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     # score
     geom_text(aes(-2500,y+.5,label=format(cluster_score,digits=3)), use(contigs)) +
     # contig start and end
-    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.2, yend=y+.3), use(contig_ends), linetype=2, color="black", size=.2) +
-    geom_segment(aes(x=(x+xend)/2+2, xend=(x+xend)/2+2, y=y-.2, yend=y+.3), use(contig_ends), linetype=2, color="black", size=.2) +
+    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.2, yend=y+.2), use(contig_ends), linetype=1, color="black", size=1) +
     # tRNAs and PRE1
     geom_feature(data=use(tRNAs, full=="partial"), size=5, color="blue") +
     geom_feature(data=use(tRNAs, full=="full"), size=5, color="red") +
