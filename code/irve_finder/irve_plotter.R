@@ -137,8 +137,11 @@ genes_4 <- genes_3 %>%
 contigs_0 <- genes_4 %>% group_by(genome_id, contig_id) %>%
   summarize(
     length=max(end)+500,
-    cluster_score=max(cluster_score, na.rm=T)
-  ) %>% ungroup %>%  arrange(-cluster_score)# %>%
+    cluster_score=max(cluster_score, na.rm=T),
+    seed_profile = (profile[protein_id == gene_focus])[1]
+  ) %>%
+    ungroup %>%
+    arrange(-cluster_score)# %>%
 #    mutate(plot_part = ceiling(1:n()/contigs_per_page))
 
 contig_lengths <- left_join(select(contigs_0, genome_id, contig_id),contig_lengths)
@@ -201,7 +204,7 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     # islands
     #geom_feature(aes(y=y+.30, yend=y+.30), data=use(islands), size=2, color="burlywood2") +
     geom_feature(data=use(gaps), size=1, color="black") +
-    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, !secondary), size=1, color="cornflowerblue") +
+    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, !secondary), size=1, color="grey70") +
     geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, secondary), size=1, color="pink") +
     # profile source & evalue
     geom_point(aes((x+xend)/2, y+.20, alpha=virus_score), use(genes, !is.na(virus_score)), color="black") +
@@ -215,30 +218,35 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     # score
     geom_text(aes(-2500,y+.5,label=format(cluster_score,digits=3)), use(contigs)) +
     # contig start and end
-    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.2, yend=y+.2), use(contig_ends), linetype=1, color="black", size=1) +
+    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.2, yend=y+.2), use(contig_ends), linetype=1, color="black", size=2) +
     # tRNAs and PRE1
-    geom_feature(data=use(tRNAs, full=="partial"), size=5, color="blue") +
-    geom_feature(data=use(tRNAs, full=="full"), size=5, color="red") +
+    geom_feature(data=use(tRNAs, full=="partial"), size=5, color="grey40") +
+    geom_feature(data=use(tRNAs, full=="full"), size=5, color="black") +
     geom_text(aes((x+xend)/2-100, y=y-.3, label=type), use(tRNAs), angle=30, hjust=0, vjust=1, size=3) +
     #geom_feature(data=use(tRNAs, type=="tmRNA"), size=5, color="darkorchid") +
-    geom_segment(aes(x=x, xend=x, y=y-.20, yend=y-.10), data=use(PRE1), arrow=arrow(length=grid::unit(2,"mm"), type="closed"), linejoin='mitre', size=.5, color="darkgreen") +
+    geom_segment(aes(x=x, xend=x, y=y-.20, yend=y-.10), data=use(PRE1), arrow=arrow(length=grid::unit(2,"mm"), type="closed"), linejoin='mitre', size=.4, color="black") +
     scale_fill_manual(values=profile_colors) +
     scale_color_discrete(na.value=NA) +
-    coord_cartesian(xlim=c(-2500,25000))# +
-    #theme(legend.position="none")
+    coord_cartesian(xlim=c(-2500,30000)) +
+    theme(legend.position="none")
   gg
 }
 
 plot_contig_data_pages <- function(contig_data, title, genomes_per_page=20){
-  contig_data_1 <- contig_data %>%  arrange(-cluster_score) %>%
+  contig_data_1 <- contig_data %>%
+    arrange(seed_profile, -cluster_score) %>%
     mutate(plot_part = ceiling(1:n()/genomes_per_page))
   plot_parts <- sort(unique(contig_data_1$plot_part))
   gg_pages <- purrr::map(plot_parts, function(pp){
-    plot_contig_data(filter(contig_data_1,plot_part==pp),paste(title,pp), genomes_per_page=20)
+    plot_contig_data(filter(contig_data_1,plot_part==pp),paste(title,pp), genomes_per_page=genomes_per_page)
   })
   return(gg_pages)
 }
 
-pdf(out_file, title="IRVEs", width=20, height=14)
-plot_contig_data_pages(contigs_0, "IRVEs")
+pdf(out_file, title="IRVEs", width=20, height=15)
+contigs_0 %<>% add_count(seed_profile, name="seed_n")
+contigs_l <- contigs_0 %>% split(ifelse(contigs_0$seed_n > 10, contigs_0$seed_profile, "mixed"))
+map2(contigs_l, paste(names(contigs_l),'(', map(contigs_l, nrow), ')'),  ~plot_contig_data_pages(.x, .y, genomes_per_page=20))
+
+#plot_contig_data_pages(contigs_0, "IRVEs")
 dev.off()
