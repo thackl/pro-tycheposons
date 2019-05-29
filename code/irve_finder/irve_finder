@@ -155,7 +155,7 @@ sub gather_trnas{
     my $trna_full = "$out/$pre.tRNA.full.bed";
     my $trna_hits = "$out/$pre.tRNA.hits.bed";
 
-    run(qq(blastn -num_threads $threads -task blastn -db $trna_file -query $fna_file -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -outfmt 7 >$trna_blast_tsv));
+    run(qq(blastn -num_threads $threads -task blastn -db $trna_file -query $fna_file -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -max_target_seqs 100000 -outfmt 7 >$trna_blast_tsv));
     run(qq(cat $trna_blast_tsv | blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse >$trna_blast_tmp));
 
     open(TMP, $trna_blast_tmp) or die $!;
