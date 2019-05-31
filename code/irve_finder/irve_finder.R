@@ -128,9 +128,15 @@ integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targe
     }
   }
   hits_in_range <- hits_on_contig %>% filter(end>=startPos, start<=endPos)
-  # TODO: use scores from meta
-  score <- score + length(unique(hits_in_range$protein_id)) + length(unique(hits_in_range$`function`))
-  return(tibble(id=integrase$protein_id, start=startPos, upstreamType, end=endPos, downstreamType, strand=direction, score, contig_id = integrase$contig_id))
+  score <- score +
+    sum(filter(hits_in_range, !is_fragment) %>% pull(profile_irve_score)) +
+    sum(filter(hits_in_range, is_fragment) %>% pull(profile_irve_score)) * .1 +
+    length(unique(hits_in_range$`function`))
+  return(tibble(
+    contig_id = integrase$contig_id, start=startPos, end=endPos,
+    element_id=integrase$protein_id, score, strand=direction,
+    upstreamType, downstreamType, int_profile_id=integrase$profile_id,
+    profile_ids=paste(hits_in_range$profile_id, collapse=",")))
 }
 
 flag_lower_scoring_overlap <- function(clusters){
@@ -138,24 +144,13 @@ flag_lower_scoring_overlap <- function(clusters){
   loosers <- clusters %>%
     as_granges(seqnames=contig_id) %>%
     join_overlap_self(maxgap=-1L, minoverlap=100L) %>%
-    filter(id < id.overlap) %>%
-    mutate(looser = if_else(score<score.overlap, id, id.overlap)) %>%
+    filter(element_id < element_id.overlap) %>%
+    mutate(looser = if_else(score<score.overlap, element_id, element_id.overlap)) %>%
     as_tibble %>%
     pull(looser) %>%
     unique
-  return(clusters$id %in% loosers)
+  return(clusters$element_id %in% loosers)
 }
-
-target_functions <- c("Tyrosine Recombinase", "Large Serine Recombinase", "Serine Recombinase")
-int_ids <- hitpos %>%
-  filter(`function` %in% target_functions & irve_score > 0) %>%
-  pull(protein_id) %>% unique
-
-scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,contig_lengths,tRNAs,target_functions)
-
-scored_clusters_1 <- scored_clusters_0 %>%
-  mutate(secondary=flag_lower_scoring_overlap(.)) %>%
-  arrange(secondary,-score)
 
 get_no_int_clusters <- function(hitpos, existing_clusters, max_dist=5000, min_size=3){
   # filter all hits that are on any existing cluster
@@ -181,13 +176,16 @@ get_no_int_clusters <- function(hitpos, existing_clusters, max_dist=5000, min_si
   scored_no_int_clusters <- no_int_clusters %>%
     group_by(cluster_id) %>%
     summarize(
-      id=dplyr::first(protein_id, order_by=start),
-      start=min(start),
-      upstreamType="no_int", end=max(end),
-      downstreamType="no_int",
-      strand="+",
-      score=length(module)+length(unique(module)),
       contig_id=dplyr::first(contig_id),
+      start=min(start),
+      end=max(end),
+      element_id=dplyr::first(protein_id, order_by=start),
+      score=length(module)+length(unique(module)),
+      strand="+",
+      upstreamType="no_int",
+      downstreamType="no_int",
+      int_profile_id=NA,
+      profile_ids=paste(profile_id, collapse=","),
       secondary=FALSE
     ) %>%
     ungroup %>%
@@ -195,6 +193,19 @@ get_no_int_clusters <- function(hitpos, existing_clusters, max_dist=5000, min_si
 
   return(scored_no_int_clusters)
 }
+
+
+target_functions <- c("Tyrosine Recombinase", "Large Serine Recombinase", "Serine Recombinase")
+int_ids <- hitpos %>%
+  filter(`function` %in% target_functions & profile_irve_score > 0) %>%
+  pull(protein_id) %>% unique
+
+scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,contig_lengths,tRNAs,target_functions)
+
+scored_clusters_1 <- scored_clusters_0 %>%
+  mutate(secondary=flag_lower_scoring_overlap(.)) %>%
+  #  arrange(secondary,-score)
+  filter(!secondary) %>% arrange(-score)
 
 no_int_clusters <- get_no_int_clusters(hitpos, scored_clusters_1)
 
