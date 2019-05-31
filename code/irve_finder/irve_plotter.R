@@ -3,6 +3,7 @@ library(devtools)
 library(thacklr)
 library(patchwork)
 library(gggenomes)
+library(viridis)
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args) < 9){
@@ -18,9 +19,11 @@ gap_file <- args[5] #"test/MIT0604/MIT0604.gap.bed"
 pre1_file <- args[6] #"test/MIT0604/pre1.hits.tsv"
 virus_file <- args[7] #"test/MIT0604/virsorter.hits.tsv"
 meta_file <- args[8]
-out_file <- args[9] #"test/MIT0604/clusters.pdf"
+cog_file <- args[9]
+island_file <- args[10]
+out_file <- args[11] #"test/MIT0604/clusters.pdf"
 
-cluster_flank_length <- 1000
+cluster_flank_length <- 3000
 contigs_per_page <- 20
 
 # gene coords
@@ -28,12 +31,11 @@ genes_0 <- read_tsv(gene_file, col_names=c("contig_id", "start", "end", "protein
   mutate(length = end - start + 1)
 
 # elements
-element_0 <- read_tsv(element_file) %>%
-  filter(!secondary)
+element_0 <- read_tsv(element_file) %>% filter(!secondary)
 
 element_bounds <- element_0 %>%
   transmute(
-    element_id=id,
+    element_id,
     contig_id,
     cluster_score=score,
     archetype=upstreamType,
@@ -43,7 +45,7 @@ element_bounds <- element_0 %>%
   )
 
 element_1 <- element_0 %>%
-  select(genome_id=id, contig_id, start, end, strand, score, secondary) %>%
+  select(genome_id=element_id, contig_id, start, end, strand, score, secondary) %>%
   mutate(genome_id=str_replace_all(genome_id,"-","_"))
 
 contig_lengths <- bind_rows(select(genes_0, contig_id, end)) %>%
@@ -78,11 +80,18 @@ virus_hits_0 <- read_tsv(virus_file, col_names=c("protein_id","virus_profile","v
   group_by(protein_id) %>% arrange(-virus_score) %>%
   summarize_all(first) # best hit only
 
+cogs_0 <- read_tsv(cog_file) %>% select(protein_id = gene_id, cog_num_strains)
+islands_0 <- read_tsv(island_file)
+
+
 # now clusters contain all gene - flanking, w/ and w/o hit
 genes_3 <- left_join(genes_2, hits_0) %>%
   mutate(class = str_match(profile, "^([^_]+)")[,2]) %>%
   mutate(set = str_match(profile, "_([^-]+)$")[,2]) %>%
-  left_join(virus_hits_0, by=c("protein_id"))
+  mutate(profile_expr = str_replace(profile, "_[^-]+-?(.*)", "[\\1]")) %>%
+  left_join(virus_hits_0, by=c("protein_id")) %>%
+  left_join(cogs_0)
+
 
 #print(genes_2)
 #genes_2 %<>% split(.$element_id) %>%
@@ -130,8 +139,6 @@ genes_4 <- genes_3 %>%
   mutate(
     gene_focus = str_replace(element_id, "AG_(...)_", "AG-\\1-"),
     evalue_bin = cut(hmmer_evalue, c(Inf,1,1e-1,1e-3,1e-10,-Inf), label=F))
-#print(genes_5 %>% arrange(-cluster_score,element_id) %>% select(element_id, start, end, strand))
-#quit()
 
 # dummy contigs, one per cluster
 contigs_0 <- genes_4 %>% group_by(genome_id, contig_id) %>%
@@ -143,6 +150,9 @@ contigs_0 <- genes_4 %>% group_by(genome_id, contig_id) %>%
     ungroup %>%
     arrange(-cluster_score)# %>%
 #    mutate(plot_part = ceiling(1:n()/contigs_per_page))
+
+islands_1 <- contigs_0 %>% select(genome_id, contig_id) %>%
+  left_join(select(islands_0, -genome_id))
 
 contig_lengths <- left_join(select(contigs_0, genome_id, contig_id),contig_lengths)
 contig_ends <- bind_rows(
@@ -156,12 +166,50 @@ contig_ends <- bind_rows(
 cluster_order <- contigs_0 %>% pull(genome_id) %>% paste0("$")
 
 #------------------------------------------------------------------------------# tRNAs
+aa3to1 <- function(aa3){
+  aa1 <- read_tsv(
+"aa_name	aa3	aa1
+Alanine	Ala	A
+Arginine	Arg	R
+Asparagine	Asn	N
+Aspartic acid	Asp	D
+Cysteine	Cys	C
+Glutamic acid	Glu	E
+Glutamine	Gln	Q
+Glycine	Gly	G
+Histidine	His	H
+Isoleucine	Ile	I
+Leucine	Leu	L
+Lysine	Lys	K
+Methionine	Met	M
+Phenylalanine	Phe	F
+Proline	Pro	P
+Serine	Ser	S
+Threonine	Thr	T
+Tryptophan	Trp	W
+Tyrosine	Tyr	Y
+Valine	Val	V
+Selenocysteine	seC	X
+") %>% select(-1) %>% deframe
+  return(aa1[aa3])
+}
+
+expressify_tRNA <- function(tRNA_labels){
+  str_split(tRNA_labels, "[-()]", simplify=T) %>%
+    as_tibble() %>% mutate(V2 = aa3to1(V2)) %>%
+    mutate(tRNA_exp = ifelse(V1 == "tmRNA", V1, paste0(V2,"[", V3, "]"))) %>%
+    pull(tRNA_exp)
+}
+
 tRNAs_0 <- read_tsv(tRNA_file, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
 tRNAs_1 <- wrap_features_for_circular(tRNAs_0, contig_lengths)
 tRNAs_2 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
   left_join(tRNAs_1, by=c("contig_id")) %>%
   filter(start>=ele_start, end<=ele_end) %>%
-  mutate(type = str_replace(type, "tRNA-", ""), strand=if_else(strand %in% c('+','-'), strand, '.'))
+  mutate(
+    expr = expressify_tRNA(type),
+    strand=if_else(strand %in% c('+','-'), strand, '.')
+  ) %>% unique # not sure why but some tRNAs get multipied
 
 #------------------------------------------------------------------------------
 # gaps
@@ -192,7 +240,9 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     add_features(element_1, "element") %>%
     add_features(gaps_1, "gaps") %>%
     add_features(contig_ends, "contig_ends") %>%
-    add_features(pre1_2, "PRE1")
+    add_features(pre1_2, "PRE1") %>%
+    add_features(islands_1, "islands")
+
   # adjust layout
   gg <- gg %>%
     reorder(cluster_order) %>%
@@ -202,33 +252,35 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
   gg <- gg +
     ggtitle(title) +
     # islands
-    #geom_feature(aes(y=y+.30, yend=y+.30), data=use(islands), size=2, color="burlywood2") +
+    geom_feature(aes(y=y+.25, yend=y+.25), data=use(islands), size=2, color="grey70") +
     geom_feature(data=use(gaps), size=1, color="black") +
-    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, !secondary), size=1, color="grey70") +
-    geom_feature(aes(y=y+.30, yend=y+.30), data=use(element, secondary), size=1, color="pink") +
+    geom_feature(aes(y=y+.3, yend=y+.3), data=use(element, !secondary), size=.5, color="black") +
+    #geom_feature(aes(y=y+.25, yend=y+.25), data=use(element, secondary), size=1, color="pink") +
     # profile source & evalue
-    geom_point(aes((x+xend)/2, y+.20, alpha=virus_score), use(genes, !is.na(virus_score)), color="black") +
+    #geom_feature(aes(y=y+.40, yend=y+.40, alpha=virus_score), use(genes, !is.na(virus_score)), color="black", show.legend=FALSE, size=1) +
     #geom_point(aes((x+xend)/2, y+.3), use(genes, !is.na(set)), color="black", shape=21, size=2) +
     # genes
     geom_gene(aes(fill=profile), color="black", arrowhead_width=grid::unit(3,"mm"),
               arrowhead_height=grid::unit(3,"mm"),
-              arrow_body_height=grid::unit(3,"mm")) +
+              arrow_body_height=grid::unit(3,"mm"), show.legend=FALSE) +
+    geom_feature(aes(y=y+.25, yend=y+.25, color=pmax(sqrt(cog_num_strains), sqrt(10))), use(genes), size=1) +
     #geom_text(aes((x+xend)/2-100, y=y-.3, label=str_extract(profile, "^[^_]+")), use(genes), angle=30, hjust=0, vjust=1, size=3) +
-    geom_text(aes((x+xend)/2-100, y=y-.3, label=profile), use(genes), angle=30, hjust=0, vjust=1, size=3) +
+    geom_text(aes(pmin(x,xend)+0.2*abs(x-xend), y=y-.3, label=profile_expr), use(genes, !str_detect(profile, "^rep")), angle=30, hjust=0, vjust=1, size=3, parse=TRUE) +
     # score
-    geom_text(aes(-2500,y+.5,label=format(cluster_score,digits=3)), use(contigs)) +
+    geom_text(aes(0, y+.45,label=format(cluster_score,digits=3)), use(contigs), hjust=1) +
     # contig start and end
-    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.2, yend=y+.2), use(contig_ends), linetype=1, color="black", size=2) +
+    geom_segment(aes(x=(x+xend)/2-2, xend=(x+xend)/2-2, y=y-.4, yend=y+.4), use(contig_ends), linetype=1, color="royalblue3", size=.5) +
     # tRNAs and PRE1
-    geom_feature(data=use(tRNAs, full=="partial"), size=5, color="grey40") +
-    geom_feature(data=use(tRNAs, full=="full"), size=5, color="black") +
-    geom_text(aes((x+xend)/2-100, y=y-.3, label=type), use(tRNAs), angle=30, hjust=0, vjust=1, size=3) +
+    geom_feature(data=use(tRNAs, full=="partial"), size=6, color="grey30") +
+    geom_feature(data=use(tRNAs, full=="full"), size=6, color="black") +
+    geom_text(aes(pmin(x,xend)-100, y=y-.35, label=expr), use(tRNAs), angle=30, hjust=0, vjust=1, size=3, parse=TRUE) +
     #geom_feature(data=use(tRNAs, type=="tmRNA"), size=5, color="darkorchid") +
-    geom_segment(aes(x=x, xend=x, y=y-.20, yend=y-.10), data=use(PRE1), arrow=arrow(length=grid::unit(2,"mm"), type="closed"), linejoin='mitre', size=.4, color="black") +
-    scale_fill_manual(values=profile_colors) +
-    scale_color_discrete(na.value=NA) +
-    coord_cartesian(xlim=c(-2500,30000)) +
-    theme(legend.position="none")
+    geom_segment(aes(x=x, xend=x, y=y-.11, yend=y-.10), data=use(PRE1), arrow=arrow(length=grid::unit(1.5,"mm"), type="closed"), linejoin='mitre', size=.2, color="black") +
+    scale_fill_manual(values=profile_colors, guide=FALSE) +
+    scale_color_viridis("COG freq.", direction=-1, breaks=sqrt(c(0, 25, 100, 225, 400, 625)), labels=c(0, 25, 100, 225, 400, 625)) +
+    expand_limits(cog_num_strains = c(10,623)) +
+    #theme(legend.position="none") +
+    coord_cartesian(xlim=c(-2500,35000))
   gg
 }
 
@@ -243,9 +295,15 @@ plot_contig_data_pages <- function(contig_data, title, genomes_per_page=20){
   return(gg_pages)
 }
 
-pdf(out_file, title="IRVEs", width=20, height=15)
 contigs_0 %<>% add_count(seed_profile, name="seed_n")
-contigs_l <- contigs_0 %>% split(ifelse(contigs_0$seed_n > 10, contigs_0$seed_profile, "mixed"))
+contigs_l <- contigs_0 %>% split(ifelse(contigs_0$seed_n >=5 & str_detect(contigs_0$seed_profile, "^(YR|LSR)"), contigs_0$seed_profile, "ungrouped"))
+
+if(length(contigs_l) > 1){
+  contigs_lg <- contigs_l[names(contigs_l) != "ungrouped"]
+  contigs_l <- c(contigs_lg[rev(order(map_int(contigs_lg, nrow)))], contigs_l["ungrouped"])
+}
+
+pdf(out_file, title="IRVEs", width=20, height=15)
 map2(contigs_l, paste(names(contigs_l),'(', map(contigs_l, nrow), ')'),  ~plot_contig_data_pages(.x, .y, genomes_per_page=20))
 
 #plot_contig_data_pages(contigs_0, "IRVEs")
