@@ -16,7 +16,9 @@ if(length(args) > 5){
 }
 
 hits_0 <- read_tsv(hit_file, col_names=c('protein_id','profile_id','hmmer_evalue','hmmer_score'))
-hits_1 <- hits_0 %>% group_by(protein_id) %>% arrange(-hmmer_score) %>% summarize_all(first)
+hits_1 <- hits_0 %>% group_by(protein_id) %>%
+  # top_n(1) returns multiple rows on tie, summarize to ensure single best
+  top_n(1, hmmer_score) %>% summarize_all(first)
 pos <- read_tsv(pos_file,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
 meta <- read_tsv(meta_file)
 tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
@@ -24,7 +26,19 @@ contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id
   group_by(contig_id) %>%
   summarize(len=max(end)+500)
 
-hitpos <- left_join(hits_1,pos) %>% left_join(meta)
+# keep low scoring hits if fragmented gene (multiple adjacent hits)
+hitpos_0 <- left_join(hits_1,pos) %>% left_join(meta) %>%
+  arrange(contig_id, start) %>%
+  group_by(contig_id) %>%
+  # look around and find same profile directly adjacent -> fragmented gene
+  mutate(is_fragment = hmmer_score < profile_ga_score & (
+           (profile_id == lag(profile_id, 1L, "") & abs(start - lag(end, 1L, Inf)) < 500) |
+           (profile_id == lead(profile_id, 1L, "") & abs(end - lead(start, 1L, Inf)) < 500) |
+           (profile_id == lag(profile_id, 2L, "") & abs(start - lag(end, 2L, Inf)) < 1000) |
+           (profile_id == lead(profile_id, 2L, "") & abs(end - lead(start, 2L, Inf)) < 1000)))
+hitpos <- hitpos_0 %>%
+  filter(hmmer_score >= .5 * profile_ga_score | is_fragment)
+
 
 integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targetFunctions, upstreamRange=1000, downstreamRange=25000, minLen=5000){
   integrase <- filter(hitpos, protein_id==proteinId) %>%
