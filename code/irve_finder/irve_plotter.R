@@ -7,7 +7,7 @@ library(viridis)
 
 args = commandArgs(trailingOnly=TRUE)
 if(length(args) < 9){
-  stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord.bed> <trna_hits.bed> <element_file> <gap.bed> <pre1.hits.bed> <virus.hits.tsv> <irve-info.tsv> <out.pdf>", call.=FALSE)
+  stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord.bed> <trna_hits.bed> <element_file> <gap.bed> <pre1.hits.bed> <virus.hits.tsv> <irve-info.tsv> <cog_counts> <islands> <out.pdf>", call.=FALSE)
 }
 
 
@@ -45,8 +45,7 @@ element_bounds <- element_0 %>%
   )
 
 element_1 <- element_0 %>%
-  select(genome_id=element_id, contig_id, start, end, strand, score, secondary) %>%
-  mutate(genome_id=str_replace_all(genome_id,"-","_"))
+  select(genome_id=element_id, contig_id, start, end, strand, score, secondary)
 
 contig_lengths <- bind_rows(select(genes_0, contig_id, end)) %>%
   group_by(contig_id) %>%
@@ -68,8 +67,7 @@ genes_1 <- wrap_features_for_circular(genes_0, contig_lengths)
 genes_2 <- left_join(genes_1, element_bounds) %>%
   filter((start > ele_start & start < ele_end) |
            (end < ele_end & end > ele_start)) %>%
-           mutate(genome_id=str_replace_all(element_id,"-","_"))
-
+           mutate(genome_id=element_id)
 # hits
 hits_0 <- read_tsv(v5_hit_file, col_names=c("protein_id","profile","hmmer_evalue","hmmer_score"), col_types="ccnn") %>%
   group_by(protein_id) %>% arrange(hmmer_evalue) %>%
@@ -137,7 +135,7 @@ profile_colors <- meta_0 %>% select(profile_id, plot_color) %>% deframe
 # add evalue bin
 genes_4 <- genes_3 %>%
   mutate(
-    gene_focus = str_replace(element_id, "AG_(...)_", "AG-\\1-"),
+    gene_focus = element_id,
     evalue_bin = cut(hmmer_evalue, c(Inf,1,1e-1,1e-3,1e-10,-Inf), label=F))
 
 # dummy contigs, one per cluster
@@ -159,7 +157,7 @@ contig_ends <- bind_rows(
   select(contig_lengths, genome_id, contig_id) %>% mutate(start=-500, end=0, strand="+"),
   select(contig_lengths, genome_id, contig_id, end=len) %>% mutate(start=end-500, strand="+")
 ) %>%
-  left_join(transmute(element_bounds, genome_id=str_replace_all(element_id,"-","_"), ele_start, ele_end)) %>%
+  left_join(transmute(element_bounds, genome_id=element_id, ele_start, ele_end)) %>%
   filter(start>=ele_start, end<=ele_end)
 
 # order by score - add "$" as hotfix for reorder's partial matching
@@ -203,7 +201,7 @@ expressify_tRNA <- function(tRNA_labels){
 
 tRNAs_0 <- read_tsv(tRNA_file, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
 tRNAs_1 <- wrap_features_for_circular(tRNAs_0, contig_lengths)
-tRNAs_2 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
+tRNAs_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
   left_join(tRNAs_1, by=c("contig_id")) %>%
   filter(start>=ele_start, end<=ele_end) %>%
   mutate(
@@ -217,7 +215,7 @@ gaps_0 <- read_tsv(gap_file, col_names=c("contig_id", "start", "end", "gap_id", 
 gaps_1 <- tibble(contig_id=character(0), genome_id=character(0), start=numeric(0), end=numeric(0), strand=character(0))
 if(nrow(gaps_0) > 0){
   gaps_1 <- wrap_features_for_circular(gaps_0, contig_lengths)
-  gaps_1 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
+  gaps_1 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
     left_join(gaps_1, by=c("contig_id")) %>%
     filter(start>=ele_start, end<=ele_end)
 }
@@ -230,7 +228,7 @@ flip <- genes_4 %>%
 
 pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
 pre1_1 <- wrap_features_for_circular(pre1_0, contig_lengths)
-pre1_2 <- element_bounds %>% transmute(genome_id=str_replace_all(element_id,"-","_"), contig_id, ele_start, ele_end) %>%
+pre1_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
   left_join(pre1_1, by=c("contig_id")) %>%
   filter(start>=ele_start, end<=ele_end)
 
@@ -279,7 +277,6 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     scale_fill_manual(values=profile_colors, guide=FALSE) +
     scale_color_viridis("COG freq.", direction=-1, breaks=sqrt(c(0, 25, 100, 225, 400, 625)), labels=c(0, 25, 100, 225, 400, 625)) +
     expand_limits(cog_num_strains = c(10,623)) +
-    #theme(legend.position="none") +
     coord_cartesian(xlim=c(-2500,35000))
   gg
 }
