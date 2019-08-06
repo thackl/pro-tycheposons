@@ -6,15 +6,16 @@ no warnings "qw";
 use strict;
 use Getopt::Long  qw(:config no_ignore_case bundling);
 use Data::Dumper;
+use File::Basename;
 use FindBin qw($RealBin);
 use List::Util qw(min max);
 
 GetOptions (
     "out-dir|o=s" => \(my $out = "irve_finder"),
-    "irve|i=s" => \(my $irve_file),
-    "irve-info|x=s" => \(my $irve_info_file),
+    "irve|i=s" => \(my $irve_file = "$RealBin/../../data/irve-v6.hmm"),
+    "irve-info|x=s" => \(my $irve_info_file = "$RealBin/../../data/irve-v6-info.tsv"),
     "faa|a=s" => \(my $faa_file),
-    "virus|v=s" => \(my $virus_file),
+    "virus|v=s" => \(my $virus_file = ""),
     "trna|r=s" => \(my $trna_file),
     "pre1=s" => \(my $pre1_file),
     "threads|t=i" => \(my $threads = 4),
@@ -27,10 +28,10 @@ if ($help || @ARGV == 0 || @ARGV > 2){
     print "in genomes, and plot them.\n\n";
     print "Usage: irve_finder [options] {.fna | .fna .gff | .gff-with-seq}\n";
     printf " %-19s  %s\n", "-a/--faa", "protein file in fasta format [get from gff+fna if req.]";
-    printf " %-19s  %s\n", "-i/--irve", "IRVE .hmm file or precomputed hmmer hits (.tbl/.tsv) [$RealBin/data/irve-v6.hmm]";
-    printf " %-19s  %s\n", "-x/--irve-info", "irve info file [$RealBin/data/irve]";
-    printf " %-19s  %s\n", "-v/--virus", "Virus .hmm file or precomputed hmmer hits (.tbl/.tsv) [$RealBin/data/virsorter_Pool_clusters.hmm]";
-    printf " %-19s  %s\n", "-r/--trna", "tRNA fasta";
+    printf " %-19s  %s\n", "-i/--irve", "IRVE .hmm file or precomputed hmmer hits (.tbl/.tsv) [$irve_file]";
+    printf " %-19s  %s\n", "-x/--irve-info", "irve info file [$irve_info_file]";
+    printf " %-19s  %s\n", "-v/--virus", "Virus .hmm file or precomputed hmmer hits (.tbl/.tsv) [$virus_file]";
+    printf " %-19s  %s\n", "-r/--trna", "precomputed full-length tRNA fasta, use if .fna might not contain full-length tRNAs at all";
     printf " %-19s  %s\n", "-p/--pre1", "PRE1 repeat nucleotide hmm/tbl/tsv";
     printf " %-19s  %s\n", "-t/--threads", "number of threads to use in external commands";
     printf " %-19s  %s\n", "-o/--out", "write to this dir/prefix";
@@ -53,15 +54,19 @@ if (@ARGV == 1) {
 }else {
     ($fna_file, $gff_file) = @ARGV;
 }
-$pre=$ARGV[0]; $pre =~ s/\.[^.]+$//;
+
+$pre = basename($ARGV[0]);
+$pre =~ s/\.[^.]+$//;
 
 # setup out dir
 $out||=".";
 unless (-d $out) { mkdir $out or die $!; }
 
 # annotate genomes if necessary
+my $predict_trna = 0;
 if (!$gff_file){ # run prodigal to get $faa_file
     print STDERR "Predicting genes wit prodigal\n";
+    $predict_trna++;
     $gff_file = "$out/$pre.gff";
     $faa_file = "$out/$pre.faa";
     run(qq(prodigal -i $fna_file -f gff -o $gff_file -a $faa_file));
@@ -78,7 +83,7 @@ if (!$faa_file && $need_faa){
 print STDERR "\nExtracting features from gff\n";
 my $cds_bed = extract_features($gff_file, "CDS");
 my $gap_bed = extract_features($gff_file, "gap");
-my $trna_bed = extract_features($gff_file, "tRNA,tmRNA");
+my $trna_bed = $predict_trna ? predict_trnas() : extract_features($gff_file, "tRNA,tmRNA");
 
 print STDERR "\nGathering annotations\n";
 my $irve_hits = gather_annotations($irve_file, "irve.hits", $faa_file) if $irve_file;
@@ -86,7 +91,7 @@ my $virus_hits = gather_annotations($virus_file, "virus.hits", $faa_file) if $vi
 my $pre1_hits = gather_annotations($pre1_file, "pre1.nhmmscan.hits", $fna_file, 1) if $pre1_file;
 
 print STDERR "\nSearching for (partial) tRNAs\n";
-$trna_file && -z $trna_bed && predict_trnas();
+if (!$trna_file){ die "currently not implemented\n - extract tRNAs based on prediction bed, seqkit or so." }
 my $trna_hits = gather_trnas($trna_file) if $trna_file;
 
 print STDERR "\nDetecting IRVE elements\n";
@@ -139,7 +144,9 @@ sub extract_features{
     my ($gff_file, $feat) = @_;
     my $suf = $feat;
     $suf =~ s/,/-/g;
-    run(qq(gff2bed $gff_file --feat $feat > $out/$pre.$suf.bed));
+    if (! -e "$out/$pre.$suf.bed") {
+        run(qq(gff2bed $gff_file --feat $feat > $out/$pre.$suf.bed));
+    }
     return "$out/$pre.$suf.bed";
 }
 
@@ -182,7 +189,7 @@ sub gather_trnas{
 
 
 sub run{
-    my($cmd, $print) = @_;
+    my($cmd, $print) = (@_, $debug);
     print "+ $cmd\n" if $print;
     my $log = qx($cmd);
     die $log, "\nDo'h, something went wrong" if $?;
