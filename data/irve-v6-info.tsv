@@ -1,0 +1,129 @@
+profile_id	module	function	profile_ga_score	profile_irve_score	plot_color	function_based_on	hhsearch_pfam_name	hhsearch_pfam_acc	profile_id_irve-v6-r1	profile_id_pici-v5	notes
+YR_IRVE-A	Integration	Tyrosine Recombinase	409.6	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YA		
+YR_IRVE-M	Integration	Tyrosine Recombinase	384.2	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YM		
+YR_IRVE-P	Integration	Tyrosine Recombinase	305.8	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YP		
+YR_IRVE-R	Integration	Tyrosine Recombinase	446.3	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YR		
+YR_IRVE-S	Integration	Tyrosine Recombinase	387.6	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YS		
+YR_IRVE-T1	Integration	Tyrosine Recombinase	605.6	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YT1		
+YR_IRVE-T2	Integration	Tyrosine Recombinase	427.1	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-YT2		
+YR_IRVE-tm	Integration	Tyrosine Recombinase	630.7	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Ytm		
+YR_Pro	Integration	Tyrosine Recombinase	459.3	-5	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y1		Core gene
+YR_IRVE-1	Integration	Tyrosine Recombinase	639	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y10		
+YR_IRVE-2	Integration	Tyrosine Recombinase	152.6	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y2		
+YR_IRVE-3	Integration	Arm-less Tyrosine Recombinase	205.8	2	#fbe8aa	Homology & Context & Catalytic Site			IntY_IRVE-Y3		
+YR_IRVE-4	Integration	Tyrosine Recombinase	277.4	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y4		
+YR_IRVE-5	Integration	Tyrosine Recombinase	405.9	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y5		
+YR_IRVE-6	Integration	Tyrosine Recombinase	705.3	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y6		
+YR_IRVE-7	Integration	Tyrosine Recombinase	766.7	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y7		
+YR_IRVE-8	Integration	Tyrosine Recombinase	296.4	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y8		
+YR_IRVE-9	Integration	Tyrosine Recombinase	671.1	2	#ffc300	Homology & Context & Catalytic Site			IntY_IRVE-Y9		
+YR_SM-Arch1	Integration	Tyrosine Recombinase	250	2	#ffc300	Reference			IntY_Arch1		
+YR_SM-Arch2	Integration	Tyrosine Recombinase	200	2	#ffc300	Reference			IntY_Arch2		
+YR_SM-BPP-1	Integration	Tyrosine Recombinase	250	2	#ffc300	Reference			IntY_BPP-1		
+YR_SM-Brujita	Integration	Tyrosine Recombinase	250	2	#ffc300	Reference			IntY_Brujita		
+YR_SM-TnpR	Integration	Tyrosine Recombinase	300	2	#ffc300	Reference			IntY_TnpR		
+YR_SM-CTnDOT	Integration	Tyrosine Recombinase	216	2	#ffc300	Reference			IntY_CTnDOT		
+YR_SM-Candidate	Integration	Tyrosine Recombinase	250	2	#ffc300	Reference			IntY_Candidate		
+YR_SM-Cyan	Integration	Tyrosine Recombinase	237	2	#ffc300	Reference			IntY_Cyan		
+YR_SM-Des	Integration	Tyrosine Recombinase	200	2	#ffc300	Reference			IntY_Des		
+YR_SM-KX	Integration	Tyrosine Recombinase	250	2	#ffc300	Reference			IntY_KX		
+YR_SM-Integron	Integration	Tyrosine Recombinase	271	2	#ffc300	Reference			IntY_Integron		
+YR_SM-Myc	Integration	Tyrosine Recombinase	200	2	#ffc300	Reference			IntY_Myc		
+YR_SM-P2	Integration	Tyrosine Recombinase	200	2	#ffc300	Reference			IntY_P2		
+YR_SM-RitA	Integration	Tyrosine Recombinase	270	2	#ffc300	Reference			IntY_RitA		
+YR_SM-RitB	Integration	Tyrosine Recombinase	250	2	#ffc300	Reference			IntY_RitB		
+YR_SM-RitC	Integration	Tyrosine Recombinase	300	2	#ffc300	Reference			IntY_RitC		
+YR_SM-SXT	Integration	Tyrosine Recombinase	300	2	#ffc300	Reference			IntY_SXT		
+YR_SM-Tn916	Integration	Tyrosine Recombinase	211	2	#ffc300	Reference			IntY_Tn916		
+YR_SM-TnpA	Integration	Tyrosine Recombinase	300	2	#ffc300	Reference			IntY_TnpA		
+YR_SM-Xer	Integration	Tyrosine Recombinase	230	2	#ffc300	Reference			IntY_Xer		
+YR_PF-Phage_int	Integration	Tyrosine Recombinase	27.1	2	#ffc300	Reference			IntY_Phage_integrase		
+YR_FS-1	Integration	Tyrosine Recombinase	381.2	2	#ffc300	Reference					
+YR_HM-1	Integration	Tyrosine Recombinase	484	2	#ffc300	Reference					
+YR_RM-1	Integration	Tyrosine Recombinase	395.1	2	#ffc300	Reference					
+YR_RM-2	Integration	Tyrosine Recombinase	894.6	2	#ffc300	Reference					
+LSR_IRVE	Integration	Large Serine Recombinase	511.1	2	#ff8d1a	Homology & Context & Catalytic Site			IntS_IRVE-S3		Long, full-length Serine Resolvase/Recombinase
+SSR_Pro	Integration	Small Serine Recombinase	291.2	-5	#fcbc7b	Homology & Context & Catalytic Site			IntS_IRVE-S1		Core gene
+SSR_IRVE-1	Integration	Small Serine Recombinase	54.8	2	#fcbc7b	Homology & Context & Catalytic Site			IntS_IRVE-S2		Short, Resolvase only, DNA-Invertase? - don't seed!!
+SSR_IRVE-2	Integration	Small Serine Recombinase	189.1	2	#fcbc7b	Homology & Context & Catalytic Site			IntS_IRVE-S4		Short, Resolvase only, DNA-Invertase? - don't seed!!
+SR_OH-1	Integration	Large Serine Recombinase	1278.6	2	#ff8d1a	Reference					
+SR_OH-2	Integration	Large Serine Recombinase	1522	2	#ff8d1a	Reference					
+SR_PF-Resolvase	Integration	Serine Resolvase	23.2	2	#ff8d1a	Reference			IntS_Resolvase		
+Cas1_PF	Integration	Cas-Endonuclease	22.3	2	#c87137	Reference					Casposon integrase (negative control, we don't have it)
+xis_IRVE-1	Regulation-Excision	Excisionase	27.7	2	#e172b5	Homology & Context	DUF1233, Pyocin activator, Phage_cox, Tn916_Xis	PF06806.12,PF11112.8, PF10743.9		s01	
+xis_IRVE-2	Regulation-Excision	Excisionase	44.3	2	#e172b5	Homology & Context	PyocinActivator (PtrN), Phage_AlpA, Tn916-Xis	PF11112, PF05930, PF09035			PtrN: MMC-activated, good hit to various put. xis
+xis_HM-1	Regulation-Excision	Excisionase	232.7	2	#e172b5	Reference					
+xis_HM-2	Regulation-Excision	Excisionase	204.5	2	#e172b5	Reference					
+xis_HM-3	Regulation-Excision	Excisionase	62.2	2	#e172b5	Reference					
+alpA_FS-1	Regulation-Excision	Excisionase	58	2	#e172b5	Reference					
+merR_FS-1	Regulation-Excision	Excisionase	147.5	2	#e172b5	Reference					
+reg_IRVE	Regulation-Excision	Transcriptional regulator	99.3	2	#e8006a	Context	HTH_17, TFIIE_alpha, MerR_1	PF12728.7, PF02002.17, PF13411.6	terS-1-pro		
+HTH_OH-1	Regulation-Excision	Transcriptional regulator	169.1	2	#e8006a	Reference					
+marR_OH-1	Regulation-Excision	Transcriptional regulator	568	2	#e8006a	Reference					
+PSK_OH-1	Regulation-Excision	Transcriptional regulator	151.1	2	#e8006a	Reference					
+rpr_RM-1	Regulation-Excision	Transcriptional regulator	92.1	2	#e8006a	Reference					
+stl_HM-1	Regulation-Excision	Transcriptional regulator	105.6	2	#e8006a	Reference					
+str_HM-1	Regulation-Excision	Transcriptional regulator	37.9	2	#e8006a	Reference					
+hel_IRVE-VirE	Replication	Helicase	34.2	2	#823692	Homology & Context	VirE, RNA_helicase, PPV_E1_C		hel-VirE	pri-1-pro	Helicase Superfamily 3 (https://en.wikipedia.org/wiki/Helicase, Kazlauskas D, Krupovic M, Venclovas Č. The logic of DNA replication in double-stranded DNA viruses: insights from global analysis of viral genomes. Nucleic Acids Res. 2016;44: 4551–4564. doi:10.1093/nar/gkw322)
+hel_IRVE-DnaB	Replication	Helicase	22.1	2	#823692	Homology & Context	Rad51, AAA+, DnaB, RecA		hel-Rad51	pri-2-pro	Helicase Superfamily 4 (https://en.wikipedia.org/wiki/Helicase, Kazlauskas D, Krupovic M, Venclovas Č. The logic of DNA replication in double-stranded DNA viruses: insights from global analysis of viral genomes. Nucleic Acids Res. 2016;44: 4551–4564. doi:10.1093/nar/gkw322)
+hel_IRVE-D5	Replication	Helicase	22.2	2	#823692	Homology & Context	D5, PPV_E1, VirE		hel-vir	pri-4-pro	Helicase Superfamily 3 (https://en.wikipedia.org/wiki/Helicase, Kazlauskas D, Krupovic M, Venclovas Č. The logic of DNA replication in double-stranded DNA viruses: insights from global analysis of viral genomes. Nucleic Acids Res. 2016;44: 4551–4564. doi:10.1093/nar/gkw322)
+pri_IRVE-Prim-Pol	Replication	Primase, Polymerase	28.5	2	#823692	Homology & Context	Prim-Pol	PF09250.11	pri-pol	pri-3-pro	
+pri_IRVE-Toprim	Replication	Primase	42.4	2	#823692	Homology & Context	DUF3854, Toprim		pri-top	pri-4-pro	
+top_IRVE-Topoiso	Replication	Topoisomerase	215.6	2	#823692	Homology & Context	Topoisom_I		top		
+lig_IRVE-NAD	Replication	Ligase	98.1	2	#ae9cc7	Homology & Context	DNA_ligase_aden			lig-1-pro	
+end_IRVE-TraY	Replication	Replication factor, Endonuclease subunit	65.2	2	#5f5aa3	Homology & Context	RHH, Arc-like, SeqA, TraY		s06-2	s04,s06	Also gets good hits to antitoxins (CopG, RelB), but we don't have toxins...
+rep_IRVE-Mu_Gam	Replication	Replication factor	49.7	2	#ae9cc7	Homology & Context	Phage_Mu_Gam, SeqA		s12-2	s12,s15	
+rep_IRVE-1	Replication	Replication factor	122.8	2	#ae9cc7	Homology & Context	Picorna_PA3		rep-1	s18	
+rep_IRVE-2	Replication	Replication factor	205.1	2	#ae9cc7	Context	DUF5062		rep-2	s10	Found in Vibrio
+rep_IRVE-3	Replication	Replication factor	116.7	2	#ae9cc7	Context	(coiled-coil)		rep-3	s07	
+rep_IRVE-4	Replication	Replication factor	161.3	2	#ae9cc7	Context			rep-4	s16	
+rep_IRVE-5	Replication	Replication factor	74.9	2	#ae9cc7	Context			rep-5	s02	
+rep_IRVE-6	Replication	Replication factor	77.6	2	#ae9cc7	Context			rep-6	s03	
+rep_IRVE-7	Replication	Replication factor	114.3	2	#ae9cc7	Context			rep-7	s08	
+rep_IRVE-8	Replication	Replication factor	161.8	2	#ae9cc7	Context			rep-8	s09	
+rep_IRVE-9	Replication	Replication factor	193.8	2	#ae9cc7	Context			rep-9	s14	
+rep_IRVE-10	Replication	Replication factor	227.3	2	#ae9cc7	Context			rep-10	s17	
+rep_HM-1	Replication	Replication factor	1312.3	2	#ae9cc7	Reference	DUF927	PF06048.11			
+rep_HM-2	Replication	Helicase	1165.5	2	#823692	Reference	VirE	PF05272.11			
+rep_RM-1	Replication	Helicase	1257.1	2	#823692	Reference	PPV_E1_C	PF00519.17			
+rep_RM-2	Replication	Helicase	962.4	2	#823692	Reference	PPV_E1_C	PF00519.17			
+rep_RM-3	Replication	Replication initiation	473.9	2	#ae9cc7	Reference	DnaA	PF00308.18			
+pri_HM-1	Replication	Primase	624.4	2	#823692	Reference					
+pri-rep_HM-1	Replication	Helicase, Primase	1881.9	2	#823692	Reference	PPV_E1_C, VirE_N	PF09250.11, PF00519.17			
+pri-rep_RM-1	Replication	Helicase, Primase	1950.2	2	#823692	Reference	VirE, VirE_N	PF05272.11			
+pri-rep_RM-2	Replication	Helicase, Primase	401.3	2	#823692	Reference	VirE, VirE_N	PF05272.11			
+pri_RM-1	Replication	Helicase, Primase	616	2	#823692	Reference	Prim-Pol, VirE_N				
+pri_RM-2	Replication	Primase	653.4	2	#823692	Reference	VirE_N, Primase_C	PF08800.10, PF08708.11			
+pri_RM-3	Replication	Replication factor	265.3	2	#ae9cc7	Reference	DnaB_2	PF07261.11			
+pri_FS-1	Replication	Helicase	942.7	2	#823692	Reference	D5_N, PPV_E1_C	PF08706.11, PF00519.17			
+pri_FS-2	Replication	Helicase	1061.9	2	#823692	Reference	Rad51				
+pri_FS-3	Replication	Helicase, Primase	1106.9	2	#823692	Reference	Toprim, ATPase				
+hel_PF-D5_N	Replication	Helicase	22.4	2	#823692	Reference					
+hel_PF-Pox_D5	Replication	Helicase	21.4	2	#823692	Reference					
+hel_PF-PPV_E1_C	Replication	Helicase	19.7	2	#823692	Reference					
+hel_PF-Rad51	Replication	Helicase	20.2	2	#823692	Reference					
+hel_PF-VirE	Replication	Helicase	23.5	2	#823692	Reference					
+pri_PF-DUF3854	Replication	Primase	21.6	2	#823692	Reference					
+pri_PF-Prim-Pol	Replication	Primase, Polymerase	22.8	2	#823692	Reference					
+MCP_IRVE-HK97	Packaging-Interference	Major capsid protein	576.7	2	#00baad	Homology	Phage_capsid, Peptidase_S78	PF05065, PF04586	capsid-1-pro		MCP + caudovirus serine prohead protease
+capsid_FS-1	Packaging-Interference	Major capsid protein	819.5	2	#00baad	Reference	Phage_capsid	PF05065.13			
+capsid_FS-2	Packaging-Interference	Major capsid protein	610.2	2	#00baad	Reference	Phage_cap_E	PF03864.15			
+capsid_FS-3	Packaging-Interference	Major capsid protein	712	2	#00baad	Reference	Phage_cap_E	PF03864.15			
+terS_IRVE	Packaging-Interference	Terminase small subunit (ATPase)	121.1	2	#9ae7e1	Homology	Phage_term_sma, GP3_package	PF07141, PF16677	terS-2-pro		Siphovirus-like - antisipho??
+terS_PF-Terminase_5	Packaging-Interference	Terminase small subunit (ATPase)	20.3	2	#9ae7e1	Reference	Terminase_5	PF06056	terS-PF06056-pfam		lambda phage
+terS_FS-1	Packaging-Interference	Terminase small subunit (ATPase)	224.1	2	#9ae7e1	Reference	DUF1441, Phage_Nu1	PF07278, PF07471	terS-1-fillol_salom		
+terS_FS-2	Packaging-Interference	Terminase small subunit (ATPase)	373	2	#9ae7e1	Reference	Terminase_2	PF03593	terS-2-fillol_salom		
+terS_RM-1	Packaging-Interference	Terminase small subunit (ATPase)	323.2	2	#9ae7e1	Reference	Terminase_2	PF03594	terS-1-martinez_rubio		
+terS_RM-2	Packaging-Interference	Terminase small subunit (ATPase)	190.1	2	#9ae7e1	Reference	HTH_Tnp_1_2, Terminase_2	PF13022, PF03595	terS-2-martinez_rubio		
+terS_RM-3	Packaging-Interference	Terminase small subunit (ATPase)	107.9	2	#9ae7e1	Reference	Phage_antitermQ	PF06530	terS-3-martinez_rubio		
+HDPD_FS-1	Packaging-Interference	Head-decorator protein	255.3	2	#9ae7e1	Reference					
+terS_HM-1	Packaging-Interference	Terminase small subunit (ATPase)	86.4	2	#9ae7e1	Reference	Terminase_2	PF03595	terS-1-hiramatsu		
+ltrA_RM-1	Packaging-Interference	Interference factor	219.1	2	#9ae7e1	Reference					
+packaging_HM-1	Packaging-Interference	Interference factor	398	2	#9ae7e1	Reference					
+packaging_HM-2	Packaging-Interference	Interference factor	154.1	2	#9ae7e1	Reference					
+packaging_HM-3	Packaging-Interference	Interference factor	415	2	#9ae7e1	Reference					
+packaging_HM-4	Packaging-Interference	Interference factor	245.9	2	#9ae7e1	Reference					
+packaging_HM-5	Packaging-Interference	Interference factor	166.4	2	#9ae7e1	Reference					
+php_RM-1	Packaging-Interference	Prohead serine protease	455.6	2	#9ae7e1	Reference	Peptidase_S78	PF04586.17			
+pif_HM-1	Packaging-Interference	Interference factor	192.3	2	#9ae7e1	Reference					
+unk_IRVE-1	Conserved-Unknown		144.8	2	gray50						
