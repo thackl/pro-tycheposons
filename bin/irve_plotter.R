@@ -1,3 +1,4 @@
+library(argparser)
 library(tidyverse)
 library(devtools)
 library(thacklr)
@@ -5,33 +6,30 @@ library(patchwork)
 library(gggenomes)
 library(viridis)
 
-args = commandArgs(trailingOnly=TRUE)
-if(length(args) < 9){
-  stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord.bed> <trna_hits.bed> <element_file> <gap.bed> <pre1.hits.bed> <virus.hits.tsv> <irve-info.tsv> <cog_counts> <islands> <out.pdf>", call.=FALSE)
-}
 
+p <- arg_parser("Plot IRVEs")
+p %<>% add_argument("hits", "irve.bed")
+p %<>% add_argument("gene", "CDS.bed")
+p %<>% add_argument("trna", "tRNA.bed")
+p %<>% add_argument("elements", "scored_clusters.tsv")
+p %<>% add_argument("gaps", "gap.bed")
+p %<>% add_argument("pre1", "pre1.tsv")
+p %<>% add_argument("virus", "virus.tsv")
+p %<>% add_argument("meta", "irve-info.tsv")
+p %<>% add_argument("out", "output .pdf filename",  default="irves.pdf")
+p %<>% add_argument("--cogs", "pro-623-cogs.tsv")
+p %<>% add_argument("--islands", "pro-623-allmaps-islands-novt.tsv")
+p %<>% add_argument("--cluster-flank-length", "size of region flanking the element", default = 3000)
+p %<>% add_argument("--elements-per-page", "number of elements to plot per page", default = 20)
 
-v5_hit_file <- args[1] #"test/MIT0604/pici-v5.hits.tsv"
-gene_file <- args[2] #"test/MIT0604/MIT0604.cds.bed"
-tRNA_file <- args[3] #"test/MIT0604/tRNA.hits.bed"
-element_file <- args[4] #"test/MIT0604/scored_clusters.tsv"
-gap_file <- args[5] #"test/MIT0604/MIT0604.gap.bed"
-pre1_file <- args[6] #"test/MIT0604/pre1.hits.tsv"
-virus_file <- args[7] #"test/MIT0604/virsorter.hits.tsv"
-meta_file <- args[8]
-cog_file <- args[9]
-island_file <- args[10]
-out_file <- args[11] #"test/MIT0604/clusters.pdf"
-
-cluster_flank_length <- 3000
-contigs_per_page <- 20
+args <- parse_args(p)
 
 # gene coords
-genes_0 <- read_tsv(gene_file, col_names=c("contig_id", "start", "end", "protein_id", "score", "strand")) %>%
+genes_0 <- read_tsv(args$gene, col_names=c("contig_id", "start", "end", "protein_id", "score", "strand")) %>%
   mutate(length = end - start + 1)
 
 # elements
-element_0 <- read_tsv(element_file) %>% filter(!secondary)
+element_0 <- read_tsv(args$elements) %>% filter(!secondary)
 
 element_bounds <- element_0 %>%
   transmute(
@@ -39,8 +37,8 @@ element_bounds <- element_0 %>%
     contig_id,
     cluster_score=score,
     archetype=upstreamType,
-    ele_start = start-cluster_flank_length,
-    ele_end = end+cluster_flank_length,
+    ele_start = start-args$cluster_flank_length,
+    ele_end = end+args$cluster_flank_length,
     ele_strand = strand
   )
 
@@ -69,17 +67,20 @@ genes_2 <- left_join(genes_1, element_bounds) %>%
            (end < ele_end & end > ele_start)) %>%
            mutate(genome_id=element_id)
 # hits
-hits_0 <- read_tsv(v5_hit_file, col_names=c("protein_id","profile","hmmer_evalue","hmmer_score"), col_types="ccnn") %>%
+hits_0 <- read_tsv(args$hits, col_names=c("protein_id","profile","hmmer_evalue","hmmer_score"), col_types="ccnn") %>%
   group_by(protein_id) %>% arrange(hmmer_evalue) %>%
   summarize_all(first) # best hit only
 
 # virus hits
-virus_hits_0 <- read_tsv(virus_file, col_names=c("protein_id","virus_profile","virus_evalue","virus_score"), col_types="ccnn") %>%
+virus_hits_0 <- read_tsv(args$virus, col_names=c("protein_id","virus_profile","virus_evalue","virus_score"), col_types="ccnn") %>%
   group_by(protein_id) %>% arrange(-virus_score) %>%
   summarize_all(first) # best hit only
 
-cogs_0 <- read_tsv(cog_file) %>% select(protein_id = gene_id, cog_num_strains)
-islands_0 <- read_tsv(island_file)
+if(!is.na(args$cogs))
+  cogs_0 <- read_tsv(args$cogs) %>% select(protein_id = gene_id, cog_num_strains)
+
+if(!is.na(args$islands))
+  islands_0 <- read_tsv(args$islands)
 
 
 # now clusters contain all gene - flanking, w/ and w/o hit
@@ -87,8 +88,7 @@ genes_3 <- left_join(genes_2, hits_0) %>%
   mutate(class = str_match(profile, "^([^_]+)")[,2]) %>%
   mutate(set = str_match(profile, "_([^-]+)$")[,2]) %>%
   mutate(profile_expr = str_replace(profile, "_[^-]+-?(.*)", "[\\1]")) %>%
-  left_join(virus_hits_0, by=c("protein_id")) %>%
-  left_join(cogs_0)
+  left_join(virus_hits_0, by=c("protein_id")) 
 
 
 #print(genes_2)
@@ -97,7 +97,7 @@ genes_3 <- left_join(genes_2, hits_0) %>%
 #  bind_rows
 
 ## colors ----------------------------------------------------------------------
-meta_0 <- read_tsv(meta_file)
+meta_0 <- read_tsv(args$meta)
 profile_colors <- meta_0 %>% select(profile_id, plot_color) %>% deframe
 
 ## # focus on int, or others if int is missing
@@ -149,8 +149,10 @@ contigs_0 <- genes_4 %>% group_by(genome_id, contig_id) %>%
     arrange(-cluster_score)# %>%
 #    mutate(plot_part = ceiling(1:n()/contigs_per_page))
 
-islands_1 <- contigs_0 %>% select(genome_id, contig_id) %>%
-  left_join(select(islands_0, -genome_id))
+if(!is.na(args$islands)){
+  islands_1 <- contigs_0 %>% select(genome_id, contig_id) %>%
+    left_join(select(islands_0, -genome_id))
+}
 
 contig_lengths <- left_join(select(contigs_0, genome_id, contig_id),contig_lengths)
 contig_ends <- bind_rows(
@@ -199,7 +201,7 @@ expressify_tRNA <- function(tRNA_labels){
     pull(tRNA_exp)
 }
 
-tRNAs_0 <- read_tsv(tRNA_file, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
+tRNAs_0 <- read_tsv(args$trna, col_names=c("contig_id", "start", "end", "type", "score", "strand", "full"))
 tRNAs_1 <- wrap_features_for_circular(tRNAs_0, contig_lengths)
 tRNAs_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
   left_join(tRNAs_1, by=c("contig_id")) %>%
@@ -211,7 +213,7 @@ tRNAs_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_sta
 
 #------------------------------------------------------------------------------
 # gaps
-gaps_0 <- read_tsv(gap_file, col_names=c("contig_id", "start", "end", "gap_id", "score", "strand"))
+gaps_0 <- read_tsv(args$gaps, col_names=c("contig_id", "start", "end", "gap_id", "score", "strand"))
 gaps_1 <- tibble(contig_id=character(0), genome_id=character(0), start=numeric(0), end=numeric(0), strand=character(0))
 if(nrow(gaps_0) > 0){
   gaps_1 <- wrap_features_for_circular(gaps_0, contig_lengths)
@@ -226,7 +228,7 @@ flip <- genes_4 %>%
     filter(protein_id == gene_focus & ele_strand == "-") %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
-pre1_0 <- read_tsv(pre1_file, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
+pre1_0 <- read_tsv(args$pre1, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
 pre1_1 <- wrap_features_for_circular(pre1_0, contig_lengths)
 pre1_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
   left_join(pre1_1, by=c("contig_id")) %>%
@@ -238,8 +240,10 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     add_features(element_1, "element") %>%
     add_features(gaps_1, "gaps") %>%
     add_features(contig_ends, "contig_ends") %>%
-    add_features(pre1_2, "PRE1") %>%
-    add_features(islands_1, "islands")
+    add_features(pre1_2, "PRE1")
+
+  if(!is.na(args$islands))
+    gg %<>% add_features(islands_1, "islands")
 
   # adjust layout
   gg <- gg %>%
@@ -247,11 +251,12 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     flip(flip) %>%
     focus(protein_id==gene_focus, plus=50000, center="left", restrict_to_contig=FALSE)
   # plot geoms
-  gg <- gg +
-    ggtitle(title) +
-    # islands
-    geom_feature(aes(y=y+.25, yend=y+.25), data=use(islands), size=2, color="grey70") +
-    geom_feature(data=use(gaps), size=1, color="black") +
+  gg <- gg + ggtitle(title)
+  # islands
+  if(!is.na(args$islands))
+    gg <- gg + geom_feature(aes(y=y+.25, yend=y+.25), data=use(islands), size=2, color="grey70")
+  
+  gg <- gg + geom_feature(data=use(gaps), size=1, color="black") +
     geom_feature(aes(y=y+.3, yend=y+.3), data=use(element, !secondary), size=.5, color="black") +
     #geom_feature(aes(y=y+.25, yend=y+.25), data=use(element, secondary), size=1, color="pink") +
     # profile source & evalue
@@ -260,10 +265,14 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     # genes
     geom_gene(aes(fill=profile), color="black", arrowhead_width=grid::unit(3,"mm"),
               arrowhead_height=grid::unit(3,"mm"),
-              arrow_body_height=grid::unit(3,"mm"), show.legend=FALSE) +
-    geom_feature(aes(y=y+.25, yend=y+.25, color=pmax(sqrt(cog_num_strains), sqrt(10))), use(genes), size=1) +
-    #geom_text(aes((x+xend)/2-100, y=y-.3, label=str_extract(profile, "^[^_]+")), use(genes), angle=30, hjust=0, vjust=1, size=3) +
-    geom_text(aes(pmin(x,xend)+0.2*abs(x-xend), y=y-.3, label=profile_expr), use(genes, !str_detect(profile, "^rep")), angle=30, hjust=0, vjust=1, size=3, parse=TRUE) +
+              arrow_body_height=grid::unit(3,"mm"), show.legend=FALSE)
+  if(!is.na(args$cogs))
+    gg <- gg + geom_feature(aes(y=y+.25, yend=y+.25, color=pmax(sqrt(cog_num_strains), sqrt(10))), use(genes), size=1)
+
+   #geom_text(aes((x+xend)/2-100, y=y-.3, label=str_extract(profile, "^[^_]+")), use(genes), angle=30, hjust=0, vjust=1, size=3) +
+  gg <- gg +
+    geom_text(aes(pmin(x,xend)+0.2*abs(x-xend), y=y-.3, label=profile_expr), use(genes, !str_detect(profile, "^rep")),
+              angle=30, hjust=0, vjust=1, size=3, parse=TRUE) +
     # score
     geom_text(aes(0, y+.45,label=format(cluster_score,digits=3)), use(contigs), hjust=1) +
     # contig start and end
@@ -286,6 +295,8 @@ plot_contig_data_pages <- function(contig_data, title, genomes_per_page=20){
     arrange(seed_profile, -cluster_score) %>%
     mutate(plot_part = ceiling(1:n()/genomes_per_page))
   plot_parts <- sort(unique(contig_data_1$plot_part))
+  print(contig_data_1)
+
   gg_pages <- purrr::map(plot_parts, function(pp){
     plot_contig_data(filter(contig_data_1,plot_part==pp),paste(title,pp), genomes_per_page=genomes_per_page)
   })
@@ -300,8 +311,8 @@ if(length(contigs_l) > 1){
   contigs_l <- c(contigs_lg[rev(order(map_int(contigs_lg, nrow)))], contigs_l["ungrouped"])
 }
 
-pdf(out_file, title="IRVEs", width=20, height=15)
-map2(contigs_l, paste(names(contigs_l),'(', map(contigs_l, nrow), ')'),  ~plot_contig_data_pages(.x, .y, genomes_per_page=20))
+pdf(args$out, title="IRVEs", width=20, height=15)
+map2(contigs_l, paste(names(contigs_l),'(', map(contigs_l, nrow), ')'),  ~plot_contig_data_pages(.x, .y, genomes_per_page=args$elements_per_page))
 
 #plot_contig_data_pages(contigs_0, "IRVEs")
 dev.off()
