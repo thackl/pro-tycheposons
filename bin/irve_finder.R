@@ -1,27 +1,23 @@
 library(tidyverse)
 library(magrittr)
+library(argparser)
 
-args = commandArgs(trailingOnly=TRUE)
-if(length(args) < 5){
-  stop("USAGE: Rscript cluster_finder.R <hit_file> <gene_coord.bed> <trna_hits.bed> <profile_info_file> <out_file>", call.=FALSE)
-}
-hit_file <- args[1]
-pos_file <- args[2]
-trna_file <- args[3]
-meta_file <- args[4]
-out_file <- args[5]
-interpret_contig_as_circular_if_smaller_than <- 0
-if(length(args) > 5){
-  interpret_contig_as_circular_if_smaller_than <- args[6]
-}
+p <- arg_parser("Find IRVEs")
+p %<>% add_argument("hit", "hits.bed")
+p %<>% add_argument("pos", "CDS.bed")
+p %<>% add_argument("trna", "tRNA.bed")
+p %<>% add_argument("meta", "irve-info")
+p %<>% add_argument("out", "output .pdf")
+p %<>% add_argument("--circle-max", "interpret contig as circular if smaller than this", default=0)
+args <- parse_args(p)
 
-hits_0 <- read_tsv(hit_file, col_names=c('protein_id','profile_id','hmmer_evalue','hmmer_score'))
+hits_0 <- read_tsv(args$hit, col_names=c('protein_id','profile_id','hmmer_evalue','hmmer_score'))
 hits_1 <- hits_0 %>% group_by(protein_id) %>%
   # top_n(1) returns multiple rows on tie, summarize to ensure single best
   top_n(1, hmmer_score) %>% summarize_all(first)
-pos <- read_tsv(pos_file,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
-meta <- read_tsv(meta_file)
-tRNAs <- read_tsv(trna_file, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
+pos <- read_tsv(args$pos,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
+meta <- read_tsv(args$meta)
+tRNAs <- read_tsv(args$trna, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
 contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
   group_by(contig_id) %>%
   summarize(len=max(end)+500)
@@ -50,7 +46,7 @@ integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targe
   hits_in_range <- tibble()
   trna_on_contig <- tRNAs %>% filter(contig_id == integrase$contig_id)
   hits_on_contig <- hitpos %>% filter(contig_id == integrase$contig_id)
-  is_circular <- contig_len < interpret_contig_as_circular_if_smaller_than
+  is_circular <- contig_len < args$circle_max
   if(is_circular){
     trna_on_contig <- bind_rows(
       mutate(trna_on_contig, start=start-contig_len, end=end-contig_len),
@@ -211,6 +207,6 @@ no_int_clusters <- get_no_int_clusters(hitpos, scored_clusters_1)
 
 scored_clusters_2 <- bind_rows(scored_clusters_1, no_int_clusters)
 
-write_tsv(scored_clusters_2,out_file)
+write_tsv(scored_clusters_2,args$out)
 
 warnings()
