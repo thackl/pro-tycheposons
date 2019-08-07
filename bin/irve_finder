@@ -218,9 +218,8 @@ sub run{
     die $log, "\nDo'h, something went wrong" if $?;
 }
 
-sub get_seq_lengths{
-    my ($file) = @_;
-    open(FAI, "-|", "samtools faidx $file; cat $file.fai") or die $!;
+sub read_contig_lengths{
+    open(FAI, $contig_length_file) or die $!;
     my %S;
     while (<FAI>) {
         my ($id,$len, $foo) = split("\t", $_, 3);
@@ -236,7 +235,7 @@ sub predict_trnas{
     $suf =~ s/,/-/g;
 
     my $trna_bed = "$out/$pre.$suf.bed";
-    my $seq_len = get_seq_lengths($fna_file);
+    my $seq_len = read_contig_lengths();
 
     my $ver = qx(aragorn -h | grep -oPm1 "ARAGORN v\\K\\S+");
     die $ver if $?;
