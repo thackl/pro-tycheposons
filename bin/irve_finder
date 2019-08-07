@@ -68,6 +68,11 @@ $pre =~ s/\.[^.]+$//;
 $out||=".";
 unless (-d $out) { mkdir $out or die $!; }
 
+# get contig length
+get_fna_from_gff() if !$fna_file;
+my $contig_length_file = "$out/$pre.contig-length.tsv";
+run(qq(seq-len $fna_file > $contig_length_file));
+
 # annotate genomes if necessary
 my $predict_trna = 0;
 if (!$gff_file){ # run prodigal to get $faa_file
@@ -94,17 +99,24 @@ my $gap_bed = extract_features($gff_file, "gap");
 my $trna_bed = $predict_trna ? predict_trnas($fna_file, "tRNA,tmRNA") : extract_features($gff_file, "tRNA,tmRNA");
 
 print STDERR "\nGathering annotations\n";
-my $irve_hits = gather_annotations($irve_file, "irve.hits", $faa_file) if $irve_file;
+my $irve_raw_hits = gather_annotations($irve_file, "irve.raw.hits", $faa_file) if $irve_file;
 my $virus_hits = gather_annotations($virus_file, "virus.hits", $faa_file) if $virus_file;
 my $pre1_hits = gather_annotations($pre1_file, "pre1.nhmmscan.hits", $fna_file, 1) if $pre1_file;
 
 print STDERR "\nSearching for (partial) tRNAs\n";
 my $trna_hits = gather_trnas($trna_file);
 
+print STDERR "\nPrefiltering hits\n";
+my $irve_hits = $irve_raw_hits;
+$irve_hits =~ s/\.raw//;
+run(qq(Rscript $RealBin/irve_hitfilter.R $irve_raw_hits $cds_bed $irve_info_file $irve_hits 2>&1), 1);
+
+# TODO: run att-dup blast for int-seeds
+
 print STDERR "\nDetecting IRVE elements\n";
 my $irve_tsv = "$out/$pre.scored_clusters.tsv";
 my $irve_pdf = "$out/$pre.scored_clusters.pdf";
-run(qq(Rscript $RealBin/irve_finder.R $irve_hits $cds_bed $trna_hits $irve_info_file $irve_tsv 2>&1), 1);
+run(qq(Rscript $RealBin/irve_finder.R $irve_hits $trna_hits $contig_length_file $irve_tsv 2>&1), 1);
 
 print STDERR "\nPlotting results\n";
 run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $trna_hits $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_info_file $irve_pdf 2>&1), 1);

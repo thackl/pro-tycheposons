@@ -1,12 +1,12 @@
+#!/usr/bin/env Rscript
 library(tidyverse)
 library(magrittr)
 library(argparser)
 
 p <- arg_parser("Find IRVEs")
 p %<>% add_argument("hit", "hits.bed")
-p %<>% add_argument("pos", "CDS.bed")
 p %<>% add_argument("trna", "tRNA.bed")
-p %<>% add_argument("meta", "irve-info")
+p %<>% add_argument("contig-length", "contig-length.tsv")
 p %<>% add_argument("out", "output .pdf")
 p %<>% add_argument("--circle-max", "interpret contig as circular if smaller than this", default=0)
 args <- parse_args(p)
@@ -15,25 +15,13 @@ hits_0 <- read_tsv(args$hit, col_names=c('protein_id','profile_id','hmmer_evalue
 hits_1 <- hits_0 %>% group_by(protein_id) %>%
   # top_n(1) returns multiple rows on tie, summarize to ensure single best
   top_n(1, hmmer_score) %>% summarize_all(first)
-pos <- read_tsv(args$pos,c('contig_id','start','end','protein_id','score','strand')) %>% select(-score)
-meta <- read_tsv(args$meta)
-tRNAs <- read_tsv(args$trna, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
-contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
-  group_by(contig_id) %>%
-  summarize(len=max(end)+500)
 
-# keep low scoring hits if fragmented gene (multiple adjacent hits)
-hitpos_0 <- left_join(hits_1,pos) %>% left_join(meta) %>%
-  arrange(contig_id, start) %>%
-  group_by(contig_id) %>%
-  # look around and find same profile directly adjacent -> fragmented gene
-  mutate(is_fragment = hmmer_score < profile_ga_score & (
-           (profile_id == lag(profile_id, 1L, "") & abs(start - lag(end, 1L, Inf)) < 500) |
-           (profile_id == lead(profile_id, 1L, "") & abs(end - lead(start, 1L, Inf)) < 500) |
-           (profile_id == lag(profile_id, 2L, "") & abs(start - lag(end, 2L, Inf)) < 1000) |
-           (profile_id == lead(profile_id, 2L, "") & abs(end - lead(start, 2L, Inf)) < 1000)))
-hitpos <- hitpos_0 %>%
-  filter(hmmer_score >= .5 * profile_ga_score | is_fragment)
+hitpos <- read_tsv(args$hit)
+tRNAs <- read_tsv(args$trna, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
+contig_lengths <- read_tsv(args$contig_length, col_names=c('contig_id', 'len'))
+#contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
+#  group_by(contig_id) %>%
+#  summarize(len=max(end)+500)
 
 
 integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targetFunctions, upstreamRange=1000, downstreamRange=25000, minLen=5000){
