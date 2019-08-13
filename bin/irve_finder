@@ -69,121 +69,147 @@ $out||=".";
 unless (-d $out) { mkdir $out or die $!; }
 
 # get contig length
-get_fna_from_gff() if !$fna_file;
-my $contig_length_file = "$out/$pre.contig-length.tsv";
-run(qq(seq-len $fna_file > $contig_length_file));
+if (!$fna_file){
+    $fna_file = out(".fna");
+    get_fna_from_gff($gff_file, $fna_file) unless -e $fna_file;
+}
+my $contig_length_file = out("contig-length.tsv");
+run(qq(seq-len $fna_file > $contig_length_file)) unless -e $contig_length_file;
 
 # annotate genomes if necessary
 my $predict_trna = 0;
 if (!$gff_file){ # run prodigal to get $faa_file
-    print STDERR "Predicting genes wit prodigal\n";
     $predict_trna++;
-    $gff_file = "$out/$pre.gff";
-    $faa_file = "$out/$pre.faa";
-    run(qq(prodigal -i $fna_file -f gff -o $gff_file -a $faa_file));
-    # fix prodigal gff IDs (lack locus prefix, just numbered 1_1, 1_2, ...)
-    run('perl -i -pe \'s/(\S+)(.*ID=)[^;](_\d+;)/$1$2$1$3/;\' '.$gff_file);
+    $gff_file = out(".gff");
+    $faa_file = out(".faa");
+    if (!-e $gff_file && $faa_file) {
+        print STDERR "Predicting genes wit prodigal\n";
+        run(qq(prodigal -i $fna_file -f gff -o $gff_file -a $faa_file));
+        # fix prodigal gff IDs (lack locus prefix, just numbered 1_1, 1_2, ...)
+        run('perl -i -pe \'s/(\S+)(.*ID=)[^;](_\d+;)/$1$2$1$3/;\' '.$gff_file);
+    }
 }
 
 # create protein file if necessary
 my $need_faa = ($irve_file && $irve_file !~ /(tbl|tsv)$/) ||
     ($virus_file && $virus_file !~ /(tbl|tsv)$/);
 if (!$faa_file && $need_faa){
-    print STDERR "Extracting proteins from gff\n";
-    get_faa_from_gff();
+    $faa_file = out(".faa");
+    if (!-e $faa_file) {
+        print STDERR "Extracting proteins from gff\n";
+        get_faa_from_gff($gff_file, $faa_file);
+    }
 }
 
 print STDERR "\nExtracting features from gff\n";
-my $cds_bed = extract_features($gff_file, "CDS");
-my $gap_bed = extract_features($gff_file, "gap");
-my $trna_bed = $predict_trna ? predict_trnas($fna_file, "tRNA,tmRNA") : extract_features($gff_file, "tRNA,tmRNA");
+my $cds_bed = out("-cds.bed");
+-e $cds_bed || extract_features($gff_file, $cds_bed, "CDS");
+my $gap_bed = out("-gap.bed");
+-e $gap_bed || extract_features($gff_file, $gap_bed, "gap");
+my $trna_bed = out("-trna.bed");
+if (!-e $trna_bed){
+    $predict_trna
+        ? predict_trnas($fna_file, $trna_bed, "tRNA,tmRNA")
+        : extract_features($gff_file, $trna_bed, "tRNA,tmRNA");
+}
 
 print STDERR "\nGathering annotations\n";
-my $irve_raw_hits = gather_annotations($irve_file, "irve.raw.hits", $faa_file) if $irve_file;
-my $virus_hits = gather_annotations($virus_file, "virus.hits", $faa_file) if $virus_file;
-my $pre1_hits = gather_annotations($pre1_file, "pre1.nhmmscan.hits", $fna_file, 1) if $pre1_file;
+my $irve_raw_hits = out("-irve-raw-hits.tsv");
+-e $irve_raw_hits || gather_annotations($irve_file, $irve_raw_hits, $faa_file) if $irve_file;
+my $virus_hits  = out("-virus-hits.tsv");
+-e $virus_hits || gather_annotations($virus_file, $virus_hits, $faa_file) if $virus_file;
+my $pre1_hits  = out("-pre1-hits.tsv");
+-e $pre1_hits || gather_annotations($pre1_file, $pre1_hits, $fna_file, 1) if $pre1_file;
 
 print STDERR "\nSearching for (partial) tRNAs\n";
-my $trna_hits = gather_trnas($trna_file);
+my $trna_hits = out("-trna-hits.bed");
+-e $trna_hits || gather_trnas($trna_file, $trna_hits);
 
 print STDERR "\nPrefiltering hits\n";
-my $irve_hits = $irve_raw_hits;
-$irve_hits =~ s/\.raw//;
-run(qq(Rscript $RealBin/irve_hitfilter.R $irve_raw_hits $cds_bed $irve_info_file $irve_hits 2>&1), 1);
+my $irve_hits = out("-irve-hits.tsv");
+-e $irve_hits || run(qq(Rscript $RealBin/irve_hitfilter.R $irve_raw_hits $cds_bed $irve_info_file $irve_hits 2>&1), 1);
 
 # TODO: run att-dup blast for int-seeds
+print STDERR "\nScanning for attachment site duplication\n";
+my $att_sites = out("-att-m7.tsv");
+-e $att_sites || search_att_sites($att_sites);
 
 print STDERR "\nDetecting IRVE elements\n";
-my $irve_tsv = "$out/$pre.scored_clusters.tsv";
-my $irve_pdf = "$out/$pre.scored_clusters.pdf";
-run(qq(Rscript $RealBin/irve_finder.R $irve_hits $trna_hits $contig_length_file $irve_tsv 2>&1), 1);
+my $irve_tsv = out("-elements.tsv");
+-e $irve_tsv || run(qq(Rscript $RealBin/irve_finder.R $irve_hits $trna_hits $att_sites $contig_length_file $irve_tsv 2>&1), 1);
 
-print STDERR "\nPlotting results\n";
-run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $trna_hits $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_info_file $irve_pdf 2>&1), 1);
+print STDERR "\nGenerating plots\n";
+my $irve_pdf = out("-elements.pdf");
+-e $irve_pdf || run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $trna_hits $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_info_file $irve_pdf 2>&1), 1);
 
 print STDERR "\nFinal cluster: $irve_tsv\nFinal plots:   $irve_pdf\n";
 
 #------------------------------------------------------------------------------#
+sub out{
+    my ($s, $p, $o) = (@_, $pre, $out);
+    return "$o/$p$s";
+}
+
 sub get_faa_from_gff{
-    get_fna_from_gff() if !$fna_file;
-    $faa_file = "$out/$pre.faa";
-    run(qq(seqkit subseq --feature CDS --gtf $gff_file $fna_file | seqkit translate --trim > $faa_file));
+    my($gff_file, $faa_file) = @_;
+    run(qq(seqkit subseq --quiet --feature CDS --gtf $gff_file $fna_file | seqkit translate --trim > $faa_file));
 }
 
 sub get_fna_from_gff{
-    $fna_file = "$out/$pre.fna";
+    my ($gff_file, $fna_file) = @_;
     run(qq(sed -n '/##FASTA/,\${n;p}' $gff_file > $fna_file));
     die "##FASTA section missing in .gff" if -s $fna_file;
 }
 
 sub gather_annotations{
-    my ($file, $suf, $fa_file, $nuc) = @_;
-    if ($file !~ /(tbl|tsv)$/ ){
+    my ($file, $out_file, $fa_file, $nuc) = @_;
+    my $out_pre = $out_file =~ s/\.[^.]+$//r;
+    my $tbl_file = "$out_pre.tbl";
+    my $tmp_file = "$out_pre.tmp";
+    my $tsv_file = "$out_pre.tsv";
+
+    if ($file !~ /(tbl|tsv)$/ && ! -e $tbl_file){
         if ($nuc) {
             run(qq(hmmpress $file)) unless -e $file.".h3i";
-            run(qq(nhmmscan  -o /dev/null -E 1 --cpu $threads --tblout $out/$pre.$suf.tbl $file $fa_file));
+            run(qq(nhmmscan  -o /dev/null -E 1 --cpu $threads --tblout $tbl_file $file $fa_file));
         }else{
-            run(qq(hmmsearch --cpu $threads --tblout $out/$pre.$suf.tbl -o /dev/null $file $fa_file));
+            run(qq(hmmsearch --cpu $threads --tblout $tbl_file -o /dev/null $file $fa_file));
         }
-        $file = "$out/$pre.$suf.tbl"
+        $file = $tbl_file;
     }
-    if ($file =~ /tbl$/) {
-        run(qq(hmmer-tbl2tsv $file > $out/$pre.$suf.tbl.tsv));
-        $file = "$out/$pre.$suf.tbl.tsv";
+    if ($file =~ /tbl$/ && ! -e $tmp_file) {
+        run(qq(hmmer-tbl2tsv $file > $tmp_file));
+        $file = $tmp_file;
     }
     if($nuc){
-        run(qq(tail -n+2 $file | tsv-select -f3,7,8,13,12 > $out/$pre.$suf.tsv));
+        run(qq(tail -n+2 $file | tsv-select -f3,7,8,13,12 > $tsv_file));
     } else {
-        run(qq(tail -n+2 $file | cut -f1,3,5,6 > $out/$pre.$suf.tsv));
+        run(qq(tail -n+2 $file | cut -f1,3,5,6 > $tsv_file));
     }
-    return "$out/$pre.$suf.tsv";
+    return $tsv_file;
 }
 
 sub extract_features{
-    my ($gff_file, $feat) = @_;
-    my $suf = $feat;
-    $suf =~ s/,/-/g;
-    if (! -e "$out/$pre.$suf.bed") {
-        run(qq(gff2bed $gff_file --feat $feat > $out/$pre.$suf.bed));
-    }
-    return "$out/$pre.$suf.bed";
+    my ($gff_file, $out_file, $feat) = @_;
+    run(qq(gff2bed $gff_file --feat $feat > $out_file));
+    return "$out_file";
 }
 
 sub gather_trnas{
     my ($trna_file) = @_;
     if (!$trna_file){ # get from predictions/annotations
-        $trna_file = "$out/$pre.tRNA.ffn";
-        run(qq(seqkit subseq --bed $trna_bed $fna_file | perl -pe 's/\\s/||/ if /^>/;' | seqkit rename >$trna_file));
+        $trna_file = "$out/$pre-trna.ffn";
+        run(qq(seqkit subseq --quiet --bed $trna_bed $fna_file | perl -pe 's/\\s/||/ if /^>/;' | seqkit rename >$trna_file));
     }
     return $trna_file if $trna_file =~ /bed$/; # assume precomputed
 
     run(qq(makeblastdb -dbtype nucl -in $trna_file)) if $trna_file;
-    my $trna_blast_tsv = "$out/$pre.tRNA.blastn.tsv";
-    my $trna_blast_tmp = "$out/$pre.tRNA.blastn.tmp";
-    my $trna_blast_bed = "$out/$pre.tRNA.blastn.bed";
-    my $trna_part = "$out/$pre.tRNA.partial.bed";
-    my $trna_full = "$out/$pre.tRNA.full.bed";
-    my $trna_hits = "$out/$pre.tRNA.hits.bed";
+    my $trna_blast_tsv = "$out/$pre-trna-blastn.tsv";
+    my $trna_blast_tmp = "$out/$pre-trna-blastn.tmp";
+    my $trna_blast_bed = "$out/$pre-trna-blastn.bed";
+    my $trna_part = "$out/$pre-trna-hits-partial.bed";
+    my $trna_full = "$out/$pre-trna-hits-full.bed";
+    my $trna_hits = "$out/$pre-trna-hits.bed";
 
     run(qq(blastn -num_threads $threads -task blastn -db $trna_file -query $fna_file -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -max_target_seqs 100000 -outfmt 7 >$trna_blast_tsv));
     run(qq(cat $trna_blast_tsv | blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse >$trna_blast_tmp));
@@ -231,10 +257,7 @@ sub read_contig_lengths{
 # use aragorn, parser from Torsten Seemanns PROKKA
 sub predict_trnas{
     #print STDERR "\nPredicting tRNAs and tmRNAs\n";
-    my($fna_file, $suf) = @_;
-    $suf =~ s/,/-/g;
-
-    my $trna_bed = "$out/$pre.$suf.bed";
+    my($fna_file, $trna_bed) = @_;
     my $seq_len = read_contig_lengths();
 
     my $ver = qx(aragorn -h | grep -oPm1 "ARAGORN v\\K\\S+");
@@ -308,4 +331,26 @@ sub predict_trnas{
 sub msg{
     my ($msg) = @_;
     print STDERR $msg."\n";
+}
+
+sub search_att_sites{
+    my ($att_out) = @_;
+    my $us = 2000;
+    my $ds = 30000;
+
+    # blast up- and downstream of int genes against each other
+    open(HITS, $irve_hits) or die $!;
+    while (<HITS>) {
+        chomp;
+        my @r = split("\t", $_);
+        # function
+        next unless grep{$r[9] eq $_}("Tyrosine Recombinase");
+        # contig_id 4 start 5 end 6 strand 7 protein_id 0
+        my $bed = join("\t", @r[4,5,6,0], ".", $r[7]);
+        run(qq(
+          echo "$bed" | seqkit subseq --quiet -fu $us --bed /dev/fd/0 $fna_file | perl -pe 's/^>\\S+\\s(.*)/>\$1.us/' > $out/us.fa
+          echo "$bed" | seqkit subseq --quiet -fd $ds --bed /dev/fd/0 $fna_file | perl -pe 's/^>\\S+\\s(.*)/>\$1.ds/' > $out/ds.fa
+          blastn -task blastn-short -query $out/us.fa -subject $out/ds.fa -outfmt 7 -reward 3 -penalty -6 -gapopen 9 -gapextend 3 >> $att_out));
+    }
+    return $att_out;
 }
