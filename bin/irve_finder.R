@@ -1,28 +1,40 @@
 #!/usr/bin/env Rscript
 library(tidyverse)
-library(magrittr)
+library(thacklr)
 library(argparser)
 
 p <- arg_parser("Find IRVEs")
 p %<>% add_argument("hit", "hits.bed")
 p %<>% add_argument("trna", "tRNA.bed")
+p %<>% add_argument("att", "att-blast.tsv")
 p %<>% add_argument("contig-length", "contig-length.tsv")
 p %<>% add_argument("out", "output .pdf")
 p %<>% add_argument("--circle-max", "interpret contig as circular if smaller than this", default=0)
 args <- parse_args(p)
 
-hits_0 <- read_tsv(args$hit, col_names=c('protein_id','profile_id','hmmer_evalue','hmmer_score'))
-hits_1 <- hits_0 %>% group_by(protein_id) %>%
-  # top_n(1) returns multiple rows on tie, summarize to ensure single best
-  top_n(1, hmmer_score) %>% summarize_all(first)
+# att-sites
+weigh_att_scores <- function(x, y, w, df=100, xf=60000, yf=4000){
+  ii <- seq_along(x)
+  nw <- sapply(ii, function(i){
+    d <- 1-abs(x-x[i])/df # dist to neighbor weights
+    sum(w[d>0] * d[d>0])
+  })
+  # weigh by dist to element start
+  nw <- nw * (1-abs(y)/yf) #* (1-abs(x-7500)/xf)
+  ifelse(nw >= 0, nw, NA)
+}
 
-hitpos <- read_tsv(args$hit)
-tRNAs <- read_tsv(args$trna, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
-contig_lengths <- read_tsv(args$contig_length, col_names=c('contig_id', 'len'))
-#contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
-#  group_by(contig_id) %>%
-#  summarize(len=max(end)+500)
-
+read_att_scores <-function(file, max_bitscore = 200, min_nwscore = 50){
+  read_blast(file) %>%
+    mutate(protein_id = str_replace(saccver, "\\.[ud]s$", "")) %>%
+    group_by(protein_id) %>%
+    filter(bitscore < max_bitscore) %>%
+    mutate(nwscore = weigh_att_scores((sstart+send)/2, (qstart+qend)/2,
+             bitscore)) %>%
+    filter(nwscore > min_nwscore) %>%
+    select(protein_id, nwscore, ustart=qstart, uend=qend, dstart=sstart,
+           dend=send)
+}
 
 integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targetFunctions, upstreamRange=1000, downstreamRange=25000, minLen=5000){
   integrase <- filter(hitpos, protein_id==proteinId) %>%
@@ -179,13 +191,47 @@ get_no_int_clusters <- function(hitpos, existing_clusters, max_dist=5000, min_si
 }
 
 
+#setwd("../irve-finder-20190807-204501")
+#args <- parse_args(p, c("MIT0604.irve.hits.tsv", "MIT0604.tRNA.hits.bed", "MIT0604.att-m7.tsv", "MIT0604.contig-length.tsv", "bar.tsv"))
+
+hitpos <- read_tsv(args$hit)
+tRNAs <- read_tsv(args$trna, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
+contig_lengths <- read_tsv(args$contig_length, col_names=c('contig_id', 'len'))
+#contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
+#  group_by(contig_id) %>%
+#  summarize(len=max(end)+500)
+att <- read_att_scores(args$att)
+
 target_functions <- c("Tyrosine Recombinase", "Large Serine Recombinase", "Serine Recombinase")
 int_ids <- hitpos %>%
   filter(`function` %in% target_functions & profile_irve_score > 0) %>%
   pull(protein_id) %>% unique
 
-scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,contig_lengths,tRNAs,target_functions)
+att_sites <- function(){
+upstreamRange=1000
+downstreamRange=25000
+int_id <- int_ids[4]
+integrase <- filter(hitpos, protein_id==int_id) %>%
+    arrange(hmmer_evalue) %>% head(n=1) # top hit per int
 
+hits_in_range <- if(integrase$strand[1] ==  "+"){
+  hitpos %>% filter(contig_id == integrase$contig_id, end>=integrase$start-upstreamRange, end<=integrase$end+downstreamRange)
+}else{
+  hitpos %>% filter(contig_id == integrase$contig_id, start>=integrase$start-downstreamRange, start<=integrase$end+upstreamRange)
+}
+
+hits_in_range %>% select(1,2,start,end)
+filter(att, protein_id==int_id) %>%
+  mutate(
+    ustart = integrase$start[1] - min(2000,integrase$start[1]) + ustart,
+    uend = integrase$start[1] - min(2000,integrase$start[1]) + uend,
+    dstart = integrase$end[1] + dstart,
+    dend = integrase$end[1] + dend,
+  size = dend-ustart)
+}
+
+scored_clusters_0 <- map_df(int_ids,integrase_to_element,hitpos,contig_lengths,tRNAs,target_functions)
+att %>% glimpse
 scored_clusters_1 <- scored_clusters_0 %>%
   mutate(secondary=flag_lower_scoring_overlap(.)) %>%
   #  arrange(secondary,-score)
@@ -198,3 +244,6 @@ scored_clusters_2 <- bind_rows(scored_clusters_1, no_int_clusters)
 write_tsv(scored_clusters_2,args$out)
 
 warnings()
+
+
+hitpos

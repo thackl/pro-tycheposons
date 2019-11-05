@@ -5,11 +5,12 @@ library(thacklr)
 library(patchwork)
 library(gggenomes)
 library(viridis)
-
+library(ggrepel)
 
 p <- arg_parser("Plot IRVEs")
 p %<>% add_argument("hits", "irve.bed")
 p %<>% add_argument("gene", "CDS.bed")
+p %<>% add_argument("att", "att.tsv")
 p %<>% add_argument("trna", "tRNA.bed")
 p %<>% add_argument("elements", "scored_clusters.tsv")
 p %<>% add_argument("gaps", "gap.bed")
@@ -72,9 +73,9 @@ hits_0 <- read_tsv(args$hits, col_names=c("protein_id","profile","hmmer_evalue",
   summarize_all(first) # best hit only
 
 # virus hits
-virus_hits_0 <- read_tsv(args$virus, col_names=c("protein_id","virus_profile","virus_evalue","virus_score"), col_types="ccnn") %>%
-  group_by(protein_id) %>% arrange(-virus_score) %>%
-  summarize_all(first) # best hit only
+## virus_hits_0 <- read_tsv(args$virus, col_names=c("protein_id","virus_profile","virus_evalue","virus_score"), col_types="ccnn") %>%
+##   group_by(protein_id) %>% arrange(-virus_score) %>%
+##   summarize_all(first) # best hit only
 
 if(!is.na(args$cogs))
   cogs_0 <- read_tsv(args$cogs) %>% select(protein_id = gene_id, cog_num_strains)
@@ -87,8 +88,8 @@ if(!is.na(args$islands))
 genes_3 <- left_join(genes_2, hits_0) %>%
   mutate(class = str_match(profile, "^([^_]+)")[,2]) %>%
   mutate(set = str_match(profile, "_([^-]+)$")[,2]) %>%
-  mutate(profile_expr = str_replace(profile, "_[^-]+-?(.*)", "[\\1]")) %>%
-  left_join(virus_hits_0, by=c("protein_id")) 
+  mutate(profile_expr = str_replace(profile, "_[^-]+-?(.*)", "[\\1]"))
+ #%>% left_join(virus_hits_0, by=c("protein_id"))
 
 
 #print(genes_2)
@@ -211,6 +212,75 @@ tRNAs_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_sta
     strand=if_else(strand %in% c('+','-'), strand, '.')
   ) %>% unique # not sure why but some tRNAs get multipied
 
+
+# att-sites
+weigh_att_scores <- function(x, y, w, df=50, xf=60000, yf=4000){
+  ii <- seq_along(x)
+  nw <- sapply(ii, function(i){
+    d <- 1-abs(x-x[i])/df # dist to neighbor weights
+    sum(w[d>0] * d[d>0])
+  })
+  # weigh by dist to element start
+  nw <- nw * (1-abs(y)/yf) #* (1-abs(x-7500)/xf)
+  ifelse(nw >= 0, nw, NA)
+}
+
+read_att_scores <-function(file, max_score = 400, min_score = 60, max_dist = 40){
+  d0 <- read_blast(file) %>%
+    mutate(protein_id = str_replace(saccver, "\\.[ud]s$", "")) %>%
+    group_by(protein_id) %>%
+    arrange(protein_id, sstart) %>%
+    mutate(
+      sdist = pmin(sstart,send) - lag(pmax(sstart,send),default=0),
+      schain = cumsum(ifelse(sdist <= max_dist,0,1))) %>%
+    arrange(protein_id, schain, qstart) %>%
+    mutate(
+      qdist = pmin(qstart,qend) - lag(pmax(qstart,qend),default=0),
+      qchain = cumsum(ifelse(qdist <= max_dist,0,1))
+    )
+
+  d1 <- d0 %>%
+    group_by(protein_id, schain, qchain) %>%
+    summarize(
+      hitnum = ifelse(n() > 4, 4, n()),
+      dstart = min(sstart,send),
+      dend = max(sstart,send),
+      ustart = min(qstart,qend),
+      uend = max(qstart,qend),
+      att_score = sum(bitscore)) %>%
+        filter(att_score < max_score) %>%
+    group_by(protein_id) %>%
+    #mutate(nwscore = weigh_att_scores((dstart+dend)/2, (ustart+uend)/2, bitscore)) %>%
+    filter(att_score > min_score) %>%
+    top_n(3, -ustart) %>%
+    arrange(protein_id, -att_score) %>%
+    mutate(att_color = row_number()) %>%
+      select(protein_id, hitnum, att_score, att_color, ustart, uend,
+             dstart, dend)
+  d1
+}
+
+#d0 %>% filter(protein_id == "AG-355-I20_00922") %>% print(n=50)
+
+
+#args <- list(att = "/home/thackl/Research/Pro-complex/IRVEs/irve-finder/results/irve-finder-v6-r7/pro-623-allmaps-att-m7.tsv")
+#file <- args$att
+
+att <- read_att_scores(args$att) %>%
+  left_join(genes_4) %>%
+  rename(int_start=start, int_end=end)
+
+
+att_us <- att %>%
+  mutate(
+  start = ifelse(strand == "+", int_start - pmax(ustart, uend), int_end + pmin(ustart, uend)),
+  end = ifelse(strand == "+", int_start - pmin(ustart, uend), int_end + pmax(ustart, uend)))
+att_ds <- att %>% mutate(
+  start = ifelse(strand == "+", int_end + pmin(dstart, dend), int_start - pmax(dstart, dend)),
+  end = ifelse(strand == "+", int_end + pmax(dstart, dend), int_start - pmin(dstart, dend)))
+
+filter(att_ds, protein_id == "MIT0604_1_1279") %>% glimpse
+
 #------------------------------------------------------------------------------
 # gaps
 gaps_0 <- read_tsv(args$gaps, col_names=c("contig_id", "start", "end", "gap_id", "score", "strand"))
@@ -228,11 +298,11 @@ flip <- genes_4 %>%
     filter(protein_id == gene_focus & ele_strand == "-") %>%
     pull(genome_id) %>% unique %>% paste0("$")
 
-pre1_0 <- read_tsv(args$pre1, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
-pre1_1 <- wrap_features_for_circular(pre1_0, contig_lengths)
-pre1_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
-  left_join(pre1_1, by=c("contig_id")) %>%
-  filter(start>=ele_start, end<=ele_end)
+## pre1_0 <- read_tsv(args$pre1, col_names=c("contig_id", "start", "end", "pre_evalue", "strand"))
+## pre1_1 <- wrap_features_for_circular(pre1_0, contig_lengths)
+## pre1_2 <- element_bounds %>% transmute(genome_id=element_id, contig_id, ele_start, ele_end) %>%
+##   left_join(pre1_1, by=c("contig_id")) %>%
+##   filter(start>=ele_start, end<=ele_end)
 
 plot_contig_data <- function(contig_data, title, genomes_per_page=20){
   gg <- gggenomes(contig_data, genes_4, scale = list("lab", limits=c(genomes_per_page+.5,.5))) %>%
@@ -240,7 +310,9 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     add_features(element_1, "element") %>%
     add_features(gaps_1, "gaps") %>%
     add_features(contig_ends, "contig_ends") %>%
-    add_features(pre1_2, "PRE1")
+    #add_features(pre1_2, "PRE1") %>%
+    add_features(att_us, "att_us") %>%
+    add_features(att_ds, "att_ds")
 
   if(!is.na(args$islands))
     gg %<>% add_features(islands_1, "islands")
@@ -255,13 +327,13 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
   # islands
   if(!is.na(args$islands))
     gg <- gg + geom_feature(aes(y=y+.25, yend=y+.25), data=use(islands), size=2, color="grey70")
-  
+
   gg <- gg + geom_feature(data=use(gaps), size=1, color="black") +
     geom_feature(aes(y=y+.3, yend=y+.3), data=use(element, !secondary), size=.5, color="black") +
     #geom_feature(aes(y=y+.25, yend=y+.25), data=use(element, secondary), size=1, color="pink") +
     # profile source & evalue
     #geom_feature(aes(y=y+.40, yend=y+.40, alpha=virus_score), use(genes, !is.na(virus_score)), color="black", show.legend=FALSE, size=1) +
-    #geom_point(aes((x+xend)/2, y+.3), use(genes, !is.na(set)), color="black", shape=21, size=2) +
+    #geom_point(aes((x+xend)/2, y+.2, shape=virus_profile), use(genes, !is.na(virus_score)), color="blue", size=2, show.legend=FALSE) +
     # genes
     geom_gene(aes(fill=profile), color="black", arrowhead_width=grid::unit(3,"mm"),
               arrowhead_height=grid::unit(3,"mm"),
@@ -282,11 +354,17 @@ plot_contig_data <- function(contig_data, title, genomes_per_page=20){
     geom_feature(data=use(tRNAs, full=="full"), size=6, color="black") +
     geom_text(aes(pmin(x,xend)-100, y=y-.35, label=expr), use(tRNAs), angle=30, hjust=0, vjust=1, size=3, parse=TRUE) +
     #geom_feature(data=use(tRNAs, type=="tmRNA"), size=5, color="darkorchid") +
-    geom_segment(aes(x=x, xend=x, y=y-.11, yend=y-.10), data=use(PRE1), arrow=arrow(length=grid::unit(1.5,"mm"), type="closed"), linejoin='mitre', size=.2, color="black") +
+#    geom_segment(aes(x=x, xend=x, y=y-.11, yend=y-.10), data=use(PRE1), arrow=arrow(length=grid::unit(1.5,"mm"), type="closed"), linejoin='mitre', size=.2, color="black") +
+    # att
+    geom_segment(aes(x=x, xend=xend, y=y-(att_color/10), yend=y-(att_color/10), color=att_color), data=use(att_us), size=4) +
+    geom_segment(aes(x=x, xend=xend, y=y-(att_color/10), yend=y-(att_color/10), color=att_color), data=use(att_ds), size=4) +
+    geom_text_repel(aes(x=x, y=y-.2, label=round(att_score)), data=use(att_ds), size=1.5, min.segment.length = 0.1) +
+    # scales
     scale_fill_manual(values=profile_colors, guide=FALSE) +
-    scale_color_viridis("COG freq.", direction=-1, breaks=sqrt(c(0, 25, 100, 225, 400, 625)), labels=c(0, 25, 100, 225, 400, 625)) +
+    #scale_color_viridis("COG freq.", direction=-1, breaks=sqrt(c(0, 25, 100, 225, 400, 625)), labels=c(0, 25, 100, 225, 400, 625)) +
+    scale_color_distiller(palette="Spectral", direction=1) +
     expand_limits(cog_num_strains = c(10,623)) +
-    coord_cartesian(xlim=c(-2500,35000))
+    coord_cartesian(xlim=c(-2500,30000))
   gg
 }
 

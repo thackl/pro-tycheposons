@@ -73,7 +73,7 @@ if (!$fna_file){
     $fna_file = out(".fna");
     get_fna_from_gff($gff_file, $fna_file) unless -e $fna_file;
 }
-my $contig_length_file = out("contig-length.tsv");
+my $contig_length_file = out("-contig-length.tsv");
 run(qq(seq-len $fna_file > $contig_length_file)) unless -e $contig_length_file;
 
 # annotate genomes if necessary
@@ -86,7 +86,7 @@ if (!$gff_file){ # run prodigal to get $faa_file
         print STDERR "Predicting genes wit prodigal\n";
         run(qq(prodigal -i $fna_file -f gff -o $gff_file -a $faa_file));
         # fix prodigal gff IDs (lack locus prefix, just numbered 1_1, 1_2, ...)
-        run('perl -i -pe \'s/(\S+)(.*ID=)[^;](_\d+;)/$1$2$1$3/;\' '.$gff_file);
+        run('perl -i -pe \'s/(\S+)(.*ID=)[^;]+(_\d+;)/$1$2$1$3/;\' '.$gff_file);
     }
 }
 
@@ -119,18 +119,18 @@ my $irve_raw_hits = out("-irve-raw-hits.tsv");
 my $virus_hits  = out("-virus-hits.tsv");
 -e $virus_hits || gather_annotations($virus_file, $virus_hits, $faa_file) if $virus_file;
 my $pre1_hits  = out("-pre1-hits.tsv");
--e $pre1_hits || gather_annotations($pre1_file, $pre1_hits, $fna_file, 1) if $pre1_file;
+-e $pre1_hits || ($pre1_hits = gather_annotations($pre1_file, $pre1_hits, $fna_file, 1)) if $pre1_file;
 
 print STDERR "\nSearching for (partial) tRNAs\n";
 my $trna_hits = out("-trna-hits.bed");
--e $trna_hits || gather_trnas($trna_file, $trna_hits);
+-e $trna_hits || ($trna_hits = gather_trnas($trna_file, $trna_hits));
 
 print STDERR "\nPrefiltering hits\n";
 my $irve_hits = out("-irve-hits.tsv");
 -e $irve_hits || run(qq(Rscript $RealBin/irve_hitfilter.R $irve_raw_hits $cds_bed $irve_info_file $irve_hits 2>&1), 1);
 
 # TODO: run att-dup blast for int-seeds
-print STDERR "\nScanning for attachment site duplication\n";
+print STDERR "\nScanning for attachment site duplications\n";
 my $att_sites = out("-att-m7.tsv");
 -e $att_sites || search_att_sites($att_sites);
 
@@ -140,7 +140,7 @@ my $irve_tsv = out("-elements.tsv");
 
 print STDERR "\nGenerating plots\n";
 my $irve_pdf = out("-elements.pdf");
--e $irve_pdf || run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $trna_hits $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_info_file $irve_pdf 2>&1), 1);
+-e $irve_pdf || run(qq(Rscript $RealBin/irve_plotter.R $irve_hits $cds_bed $att_sites $trna_hits $irve_tsv $gap_bed $pre1_hits $virus_hits $irve_info_file $irve_pdf 2>&1), 1);
 
 print STDERR "\nFinal cluster: $irve_tsv\nFinal plots:   $irve_pdf\n";
 
@@ -180,11 +180,13 @@ sub gather_annotations{
     if ($file =~ /tbl$/ && ! -e $tmp_file) {
         run(qq(hmmer-tbl2tsv $file > $tmp_file));
         $file = $tmp_file;
-    }
-    if($nuc){
-        run(qq(tail -n+2 $file | tsv-select -f3,7,8,13,12 > $tsv_file));
-    } else {
-        run(qq(tail -n+2 $file | cut -f1,3,5,6 > $tsv_file));
+        if($nuc){
+            run(qq(tail -n+2 $file | tsv-select -f3,7,8,13,12 > $tsv_file));
+        } else {
+            run(qq(tail -n+2 $file | cut -f1,3,5,6 > $tsv_file));
+        }
+    }else { # precomputed
+        $tsv_file = $file
     }
     return $tsv_file;
 }
@@ -212,6 +214,13 @@ sub gather_trnas{
     my $trna_hits = "$out/$pre-trna-hits.bed";
 
     run(qq(blastn -num_threads $threads -task blastn -db $trna_file -query $fna_file -reward 1 -penalty -1 -gapopen 2 -gapextend 1 -perc_identity 80 -evalue 10e-2 -max_target_seqs 100000 -outfmt 7 >$trna_blast_tsv));
+    my $got_hits = qx(grep -vcm1 '^#' $trna_blast_tsv);
+    chomp($got_hits);
+    if (!$got_hits) { # no hits
+        print "Found no partial tRNA hits\n";
+        qx(echo "" > $trna_hits);
+        return $trna_hits;
+    }
     run(qq(cat $trna_blast_tsv | blast2bed -qa | bedtools merge -delim ";" -c 4,5,6,5 -o collapse,max,distinct,collapse >$trna_blast_tmp));
 
     open(TMP, $trna_blast_tmp) or die $!;
@@ -341,16 +350,19 @@ sub search_att_sites{
     # blast up- and downstream of int genes against each other
     open(HITS, $irve_hits) or die $!;
     while (<HITS>) {
+        $. % 10 || print STDERR "\r$.";
         chomp;
         my @r = split("\t", $_);
         # function
-        next unless grep{$r[9] eq $_}("Tyrosine Recombinase");
-        # contig_id 4 start 5 end 6 strand 7 protein_id 0
+        next unless grep{$r[9] eq $_}("Tyrosine Recombinase", "Large Serine Recombinase");
+        # contig_id:4 start:5 end:6 strand:7 protein_id:0
         my $bed = join("\t", @r[4,5,6,0], ".", $r[7]);
         run(qq(
-          echo "$bed" | seqkit subseq --quiet -fu $us --bed /dev/fd/0 $fna_file | perl -pe 's/^>\\S+\\s(.*)/>\$1.us/' > $out/us.fa
+          echo "$bed" | seqkit subseq --quiet -fu $us --bed /dev/fd/0 $fna_file | seqkit seq -pr | perl -pe 's/^>\\S+\\s(.*)/>\$1.us/' > $out/us.fa
           echo "$bed" | seqkit subseq --quiet -fd $ds --bed /dev/fd/0 $fna_file | perl -pe 's/^>\\S+\\s(.*)/>\$1.ds/' > $out/ds.fa
-          blastn -task blastn-short -query $out/us.fa -subject $out/ds.fa -outfmt 7 -reward 3 -penalty -6 -gapopen 9 -gapextend 3 >> $att_out));
+          blastn -task blastn-short -query $out/us.fa -subject $out/ds.fa -outfmt 7 -reward 3 -penalty -6 -gapopen 9 -gapextend 3 >> $att_out
+));
     }
+    print STDERR "\n";
     return $att_out;
 }
