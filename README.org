@@ -8,6 +8,7 @@ See
 -  =elements-pro= for elements in /Prochlorococcus/.
 -  =elements-gorg-single-cells= for elements in other marine bacteria.
 -  =elements-tara-viral= for elements found in  Tara Oceans viral-fraction metagenome assemblies.
+- =data-pro= for reference-scaffolded and annotated /Prochlorococcus/ genomes and a phylogenetic tree.
 
 
 
