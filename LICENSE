@@ -1,0 +1,13 @@
+This work is licensed under CC-BY-SA 4.0, except for all code files which are licensed under MIT License.
+
+For the full text of the licenses see files LICENSE-CC-BY-SA and LICENSE-MIT, respectively.
+
+Directories/files licensed under MIT License:
+
+  element-finder/bin
+  element-finder/bin/irve_finder_pred.sh
+  element-finder/bin/irve_plotter.R
+  element-finder/bin/irve_finder
+  element-finder/bin/irve_hitfilter.R
+  element-finder/bin/irve_finder.sh
+  element-finder/bin/irve_finder.R
