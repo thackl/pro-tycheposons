@@ -1,22 +1,12 @@
-* IRVE Manuscript
-Draft: https://docs.google.com/document/d/1OCG3cnsXNGRqB8v3A0ODh7UIkyIXUfwqkV1E6vCvgPE
-Whiteboard: https://docs.google.com/document/d/1WnhRiB4hz3OfdBXLESpkU4fi0lDahX4Qsd6WXPG2Hno
+Supplementary code and data for our manuscripts describing a new class of mobile
+genetic elements in /Prochlorococcus/ and other marine bacteria that are
+abundant in marine vesicles and viruses.
 
-** Data
-pro-623, prokka annotation
+See =element-finder/bin= for the scripts to predict the mobile elements in genomic data.
+See =element-finder/data= for the profiles of signature genes.
+See =elements-pro= for elements in /Prochlorococcus/.
+See =elements-gorg-single-cells= for elements in other marine bacteria.
+See =elements-tara-viral= for elements found in  Tara Oceans viral-fraction metagenome assemblies.
 
-** Documentation
-*** Scaffolding
-All genomes that were already assembled to a single contig were rotated (if necessary) to start with the OriC (and dnaN on plus strand).
-All other genomes were scaffolded using ALLMAPS with the single closest reference of the complete genomes.
-After scaffolding the resulting chromosome was rotated to start with the OriC (and dnaN on plus strand).
-Finally the size of the gaps introduced by ALLMAPS were estimated to reflect the amount of missing DNA compared to the reference.
 
-For all these steps the existing prokka annotation was transferred (lift-over) to the new coordinate system.
 
-*** GI prediction (HMM)
-The island annotation from the literature was used to determine the cog-num-strain distribution of genes in islands and the backbone respectively.
-This information was used to determine the likelihood for a gene with a given cog-num-strain count to be from a core or flexible gene (a third category "inconclusive" was introduced).
-Counting the proportion of flex/core/inconclusive genes in islands and backbone as well as the frequencies of transitions allowed us to build a simple HMM (TODO: add figure).
-This HMM was initialized with clade specific (HLI, HLII, LLII, LLIV) transition and emission probabilities.
-The respective HMMs were used to predict locations of genomic islands in all genomes.
