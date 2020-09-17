@@ -1,6 +1,4 @@
-Supplementary code and data for our manuscripts describing a new class of mobile
-genetic elements in /Prochlorococcus/ and other marine bacteria that are
-abundant in marine vesicles and viruses.
+Supplementary code and data for our manuscripts "Novel integrative elements and genomic plasticity in ocean ecosystems" describing Tycheposons - a new class of mobile genetic elements in /Prochlorococcus/ and other marine bacteria that are abundant in marine vesicles and viruses.
 
 See
 - =element-finder/bin= for the scripts to predict the mobile elements in genomic data.
