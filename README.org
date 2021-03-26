@@ -7,10 +7,10 @@ See
 - =elements-gorg-single-cells= for elements in other marine bacteria.
 - =elements-tara-viral= for elements found in  Tara Oceans viral-fraction metagenome assemblies.
 - =data-pro= for reference-scaffolded and annotated /Prochlorococcus/ genomes and a phylogenetic tree.
-- =MIT0604-nanopore= for the nanopore assemblies of /Prochlorococcus/ strain
-  MIT0604 containing copies of a mobile element carrying a nitrate assimilation
+- =MIT0604-nanopore= for the nanopore assemblies of /Prochlorococcus/ strain MIT0604 containing copies of a mobile element carrying a nitrate assimilation
   gene cluster.
 - =rnaseq-pro= for differential gene expression analysis of /Prochlorococcus/ with focus on element response
+- =vesicles-abundance= for differential abundance analysis of element hallmark genes in vesicles
 
 
 
