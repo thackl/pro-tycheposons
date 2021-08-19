@@ -10,6 +10,7 @@ See
 - =MIT0604-nanopore= for the nanopore assemblies of /Prochlorococcus/ strain MIT0604 containing copies of a mobile element carrying a nitrate assimilation
   gene cluster.
 - =rnaseq-pro= for differential gene expression analysis of /Prochlorococcus/ with focus on element response
+- =YR-phylogeny= for sequences, alignment and phylogenetic tree of tyrosine recombinases.
 - =vesicles-abundance= for differential abundance analysis of element hallmark genes in vesicles
 
 
