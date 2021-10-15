@@ -257,8 +257,9 @@ sub read_contig_lengths{
     open(FAI, $contig_length_file) or die $!;
     my %S;
     while (<FAI>) {
-        my ($id,$len, $foo) = split("\t", $_, 3);
+        my ($id, $foo, $len) = split("\t", $_, 3);
         $S{$id} = $len;
+        print("$id is $len bases long");
     }
     return \%S;
 }
@@ -298,6 +299,7 @@ sub predict_trnas{
         # in linear mode (-l) we can get -ve coordinates
         $x[2] =~ m/(c)?\[-?(\d+),(\d+)\]/;
         my($revcom, $start, $end) = ($1,$2,$3);
+        msg("DBG: $x[2] -> $revcom, $start, $end") if $debug;
 
         # bug fix for aragorn when revcom trna ends at start of contig!
         #  if (defined $revcom and $start > $end) {
@@ -314,7 +316,7 @@ sub predict_trnas{
         $end = min( $end, $seq_len->{$sid} );
 
         if (abs($end-$start) > 500) {
-            msg("tRNA/tmRNA $x[2] is too big (>500bp) - skipping.");
+            msg("tRNA/tmRNA $x[2] ($start to $end) is too big (>500bp) - skipping.");
             next;
         }
         # end kludge
