@@ -259,7 +259,6 @@ sub read_contig_lengths{
     while (<FAI>) {
         my ($id, $foo, $len) = split("\t", $_, 3);
         $S{$id} = $len;
-        print("$id is $len bases long");
     }
     return \%S;
 }
@@ -356,7 +355,7 @@ sub search_att_sites{
         chomp;
         my @r = split("\t", $_);
         # function
-        next unless grep{$r[9] eq $_}("Tyrosine Recombinase", "Large Serine Recombinase");
+        next unless grep{$r[13] eq $_}("Tyrosine Recombinase", "Large Serine Recombinase");
         # contig_id:4 start:5 end:6 strand:7 protein_id:0
         my $bed = join("\t", @r[4,5,6,0], ".", $r[7]);
         run(qq(

@@ -36,7 +36,7 @@ hitpos_0 <- left_join(hits_1,pos) %>% left_join(meta) %>%
 hitpos_1 <- hitpos_0 %>%
   filter(hmmer_score >= .5 * profile_ga_score | is_fragment)
 
-select(hitpos_1, 1:13, is_fragment) %>%
+select(hitpos_1, 1:14, is_fragment) %>%
   write_tsv(args$out)
 
 warnings()
