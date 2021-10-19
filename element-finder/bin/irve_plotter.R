@@ -85,7 +85,7 @@ if(!is.na(args$islands))
 
 
 # now clusters contain all gene - flanking, w/ and w/o hit
-genes_3 <- left_join(genes_2, hits_0) %>%
+genes_3 <- left_join(genes_2, hits_0[0:4]) %>%
   mutate(class = str_match(profile, "^([^_]+)")[,2]) %>%
   mutate(set = str_match(profile, "_([^-]+)$")[,2]) %>%
   mutate(profile_expr = str_replace(profile, "_[^-]+-?(.*)", "[\\1]"))

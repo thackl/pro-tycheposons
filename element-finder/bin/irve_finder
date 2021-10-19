@@ -257,7 +257,7 @@ sub read_contig_lengths{
     open(FAI, $contig_length_file) or die $!;
     my %S;
     while (<FAI>) {
-        my ($id,$len, $foo) = split("\t", $_, 3);
+        my ($id, $foo, $len) = split("\t", $_, 3);
         $S{$id} = $len;
     }
     return \%S;
@@ -298,6 +298,7 @@ sub predict_trnas{
         # in linear mode (-l) we can get -ve coordinates
         $x[2] =~ m/(c)?\[-?(\d+),(\d+)\]/;
         my($revcom, $start, $end) = ($1,$2,$3);
+        msg("DBG: $x[2] -> $revcom, $start, $end") if $debug;
 
         # bug fix for aragorn when revcom trna ends at start of contig!
         #  if (defined $revcom and $start > $end) {
@@ -314,7 +315,7 @@ sub predict_trnas{
         $end = min( $end, $seq_len->{$sid} );
 
         if (abs($end-$start) > 500) {
-            msg("tRNA/tmRNA $x[2] is too big (>500bp) - skipping.");
+            msg("tRNA/tmRNA $x[2] ($start to $end) is too big (>500bp) - skipping.");
             next;
         }
         # end kludge
@@ -343,6 +344,8 @@ sub msg{
 }
 
 sub search_att_sites{
+    my $seq_len = read_contig_lengths();
+
     my ($att_out) = @_;
     my $us = 2000;
     my $ds = 30000;
@@ -354,11 +357,17 @@ sub search_att_sites{
         chomp;
         my @r = split("\t", $_);
         # function
+        # (the column location seems to depend on the environemtn used...)
+        #next unless grep{$r[13] eq $_}("Tyrosine Recombinase", "Large Serine Recombinase");
         next unless grep{$r[9] eq $_}("Tyrosine Recombinase", "Large Serine Recombinase");
+        # don't try to search if we're at the end of the contig/genome
+        my $start = max( min($r[5], $r[6]), 1 );
+        my $end = min( max($r[5], $r[6]), $seq_len->{$r[4]} );
+        next if ( $start == 1 or $end == $seq_len->{$r[4]} );
         # contig_id:4 start:5 end:6 strand:7 protein_id:0
         my $bed = join("\t", @r[4,5,6,0], ".", $r[7]);
         run(qq(
-          echo "$bed" | seqkit subseq --quiet -fu $us --bed /dev/fd/0 $fna_file | seqkit seq -pr | perl -pe 's/^>\\S+\\s(.*)/>\$1.us/' > $out/us.fa
+          echo "$bed" | seqkit subseq --quiet -fu $us --bed /dev/fd/0 $fna_file | seqkit seq -pr -v -t DNA | perl -pe 's/^>\\S+\\s(.*)/>\$1.us/' > $out/us.fa
           echo "$bed" | seqkit subseq --quiet -fd $ds --bed /dev/fd/0 $fna_file | perl -pe 's/^>\\S+\\s(.*)/>\$1.ds/' > $out/ds.fa
           blastn -task blastn-short -query $out/us.fa -subject $out/ds.fa -outfmt 7 -reward 3 -penalty -6 -gapopen 9 -gapextend 3 >> $att_out
 ));
