@@ -125,8 +125,8 @@ integrase_to_element <- function(proteinId, hitpos, contig_lengths, tRNAs, targe
   }
   hits_in_range <- hits_on_contig %>% filter(end>=startPos, start<=endPos)
   score <- score +
-    sum(filter(hits_in_range, !is_fragment) %>% pull(profile_irve_score)) +
-    sum(filter(hits_in_range, is_fragment) %>% pull(profile_irve_score)) * .1 +
+    sum(filter(hits_in_range, !is_fragment) %>% pull(hmmer_score)) +
+    sum(filter(hits_in_range, is_fragment) %>% pull(hmmer_score)) * .1 +
     length(unique(hits_in_range$`function`))
   return(tibble(
     contig_id = integrase$contig_id, start=startPos, end=endPos,
@@ -196,7 +196,7 @@ get_no_int_clusters <- function(hitpos, existing_clusters, max_dist=5000, min_si
 
 hitpos <- read_tsv(args$hit)
 tRNAs <- read_tsv(args$trna, col_names=c('contig_id', 'start', 'end', 'type', 'score', 'strand', 'full'))
-contig_lengths <- read_tsv(args$contig_length, col_names=c('contig_id', 'len'))
+contig_lengths <- read_tsv(args$contig_length, col_names=c('contig_id', 'desc', 'len'))
 #contig_lengths <- bind_rows(select(pos, contig_id, end), select(tRNAs, contig_id, end)) %>%
 #  group_by(contig_id) %>%
 #  summarize(len=max(end)+500)
@@ -204,7 +204,7 @@ att <- read_att_scores(args$att)
 
 target_functions <- c("Tyrosine Recombinase", "Large Serine Recombinase", "Serine Recombinase")
 int_ids <- hitpos %>%
-  filter(`function` %in% target_functions & profile_irve_score > 0) %>%
+  filter(`function` %in% target_functions & hmmer_score > 0) %>%
   pull(protein_id) %>% unique
 
 att_sites <- function(){
@@ -239,7 +239,11 @@ scored_clusters_1 <- scored_clusters_0 %>%
 
 no_int_clusters <- get_no_int_clusters(hitpos, scored_clusters_1)
 
-scored_clusters_2 <- bind_rows(scored_clusters_1, no_int_clusters)
+if (nrow(no_int_clusters) > 0) {
+    scored_clusters_2 <- bind_rows(scored_clusters_1, no_int_clusters)
+} else {
+    scored_clusters_2 <- scored_clusters_1
+}
 
 write_tsv(scored_clusters_2,args$out)
 

@@ -1,0 +1,22 @@
+channels:
+    - conda-forge
+    - bioconda
+    - jmeppley
+dependencies:
+    - thackl-seq-scripts
+    - hmmer
+    - aragorn
+    - blast
+    - bedtools
+    - prodigal
+    - r-tidyverse
+    - r-devtools
+    - r-argparser
+    - r-patchwork
+    - r-viridis
+    - r-ggrepel
+    - r-magrittr    
+    - seqkit
+    - bioconductor-plyranges
+    - r-thacklr
+    - r-gggenomes

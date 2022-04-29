@@ -1,0 +1,13 @@
+To run the irve_finder:
+
+Install the dependencies with conda + mamba:
+
+    $ mamba env create -d ./conda.env -f conda.yaml
+
+Activate the environment:
+
+    $ conda activate ./conda.env
+
+Run the test:
+
+    $ bin/irve_finder -o test_out -t 20 test/MIT0604.fna
